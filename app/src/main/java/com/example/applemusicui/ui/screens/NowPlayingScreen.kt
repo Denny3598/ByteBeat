@@ -1,4 +1,4 @@
-package com.denny.bytebeat.ui.screens
+package com.example.applemusicui.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
