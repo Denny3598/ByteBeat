@@ -35,15 +35,13 @@ import com.example.applemusicui.ui.theme.ThemeMode
 @Composable
 fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
     var tab by rememberSaveable { mutableStateOf(AppTab.Home) }
-    var currentIndex by rememberSaveable { mutableStateOf(0) }
+    var current by remember { mutableStateOf(DummyData.songs.first()) }
     var isPlaying by rememberSaveable { mutableStateOf(true) }
     var showThemeDialog by remember { mutableStateOf(false) }
 
     val c = AppTheme.colors
-    val songs = DummyData.songs
-    val current = songs[currentIndex]
     val play: (Song) -> Unit = { song ->
-        currentIndex = songs.indexOf(song).coerceAtLeast(0)
+        current = song
         isPlaying = true
     }
 
@@ -72,7 +70,9 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
                     isPlaying = isPlaying,
                     onToggle = { isPlaying = !isPlaying },
                     onNext = {
-                        currentIndex = (currentIndex + 1) % songs.size
+                        val list = DummyData.songs
+                        val index = list.indexOfFirst { it.title == current.title }
+                        current = list[(index + 1) % list.size]
                         isPlaying = true
                     },
                 )
