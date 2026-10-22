@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -48,9 +49,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.applemusicui.data.DummyData
 import com.example.applemusicui.data.RecentSearch
 import com.example.applemusicui.data.Song
+import com.example.applemusicui.data.YouTubeMusicRepository
 import com.example.applemusicui.data.defaultRecentSearches
 import com.example.applemusicui.ui.components.Artwork
 import com.example.applemusicui.ui.components.Avatar
@@ -58,6 +59,8 @@ import com.example.applemusicui.ui.components.SectionHeader
 import com.example.applemusicui.ui.components.SongRow
 import com.example.applemusicui.ui.theme.AppTheme
 import com.example.applemusicui.ui.theme.AppleRed
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 
 @Composable
 fun SearchScreen(current: Song, onPlay: (Song) -> Unit) {
@@ -67,8 +70,31 @@ fun SearchScreen(current: Song, onPlay: (Song) -> Unit) {
     val recents = remember { mutableStateListOf<RecentSearch>().apply { addAll(defaultRecentSearches) } }
     val focusManager: FocusManager = LocalFocusManager.current
 
-    val results = DummyData.songs.filter {
-        it.title.contains(query, ignoreCase = true) || it.artist.contains(query, ignoreCase = true)
+    var results by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var loading by remember { mutableStateOf(false) }
+    var errorText by remember { mutableStateOf<String?>(null) }
+
+    // Cari ke YouTube Music setiap teks berubah (jeda setengah detik supaya tidak boros).
+    LaunchedEffect(query, tab) {
+        val q = query.trim()
+        if (tab != 0 || q.isEmpty()) {
+            results = emptyList()
+            loading = false
+            errorText = null
+            return@LaunchedEffect
+        }
+        delay(500)
+        loading = true
+        errorText = null
+        try {
+            results = YouTubeMusicRepository.searchSongs(q)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            results = emptyList()
+            errorText = "Gagal memuat: ${e.message ?: e.javaClass.simpleName}"
+        }
+        loading = false
     }
 
     val submit: () -> Unit = {
@@ -113,13 +139,22 @@ fun SearchScreen(current: Song, onPlay: (Song) -> Unit) {
             }
 
             tab == 0 -> {
-                if (results.isEmpty()) {
-                    item(key = "no-results") { EmptyNote("Tidak ada hasil untuk \"$query\"") }
-                } else {
-                    items(results, key = { it.title }) { song ->
-                        Box(Modifier.padding(horizontal = 20.dp)) {
-                            SongRow(song, highlighted = song.title == current.title) { onPlay(song) }
-                        }
+                val message = when {
+                    loading && results.isEmpty() -> "Mencari…"
+                    errorText != null -> errorText
+                    results.isEmpty() -> "Tidak ada hasil untuk \"$query\""
+                    else -> null
+                }
+                if (message != null) {
+                    item(key = "search-message") { EmptyNote(message) }
+                }
+                items(results.size) { index ->
+                    val song = results[index]
+                    Box(Modifier.padding(horizontal = 20.dp)) {
+                        SongRow(
+                            song,
+                            highlighted = song.title == current.title && song.artist == current.artist,
+                        ) { onPlay(song) }
                     }
                 }
             }
