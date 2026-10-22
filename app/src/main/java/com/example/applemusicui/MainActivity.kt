@@ -1,4 +1,4 @@
-package com.denny.bytebeat
+package com.example.applemusicui
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -21,7 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.denny.bytebeat.ui.screens.NowPlayingScreen
+import com.example.applemusicui.ui.NowPlayingScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,11 +32,9 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    // --- STATE APLIKASI ---
                     var isNowPlayingOpen by remember { mutableStateOf(false) }
                     var isPlaying by remember { mutableStateOf(false) }
 
-                    // Data DUMMY (Nanti bisa diganti dengan data dari Player/ViewModel)
                     val currentTrackTitle = "Alcohol-Free"
                     val currentArtist = "TWICE"
                     val currentAlbumType = "Mini Album"
@@ -44,9 +42,7 @@ class MainActivity : ComponentActivity() {
 
                     Box(modifier = Modifier.fillMaxSize()) {
                         
-                        // ==========================================
-                        // 1. KONTEN UTAMA (HOME / DASHBOARD)
-                        // ==========================================
+                        // KONTEN UTAMA
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -64,10 +60,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        // ==========================================
-                        // 2. MINI PLAYER (BOTTOM BAR)
-                        // Tampil jika Player sedang tidak di-expand
-                        // ==========================================
+                        // MINI PLAYER (BOTTOM BAR)
                         if (!isNowPlayingOpen) {
                             Box(
                                 modifier = Modifier
@@ -110,9 +103,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        // ==========================================
-                        // 3. FULL SCREEN NOW PLAYING (SLIDE UP)
-                        // ==========================================
+                        // FULL SCREEN NOW PLAYING
                         AnimatedVisibility(
                             visible = isNowPlayingOpen,
                             enter = slideInVertically(initialOffsetY = { it }),
