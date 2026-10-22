@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -42,11 +43,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.applemusicui.data.Album
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.theme.AppTheme
@@ -56,14 +59,28 @@ import com.example.applemusicui.ui.theme.ThemeMode
 /** Dipanggil saat avatar ditekan (membuka dialog pilihan tema). */
 val LocalOnAvatarClick = staticCompositionLocalOf<() -> Unit> { {} }
 
-/** Cover art placeholder berupa gradien. */
+/** Cover art: gradien sebagai cadangan, lalu gambar asli di atasnya kalau ada. */
 @Composable
-fun Artwork(colors: List<Color>, modifier: Modifier = Modifier, corner: Dp = 8.dp) {
+fun Artwork(
+    colors: List<Color>,
+    modifier: Modifier = Modifier,
+    corner: Dp = 8.dp,
+    imageUrl: String? = null,
+) {
     Box(
         modifier
             .clip(RoundedCornerShape(corner))
             .background(Brush.linearGradient(colors))
-    )
+    ) {
+        if (!imageUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
 }
 
 @Composable
@@ -164,7 +181,7 @@ fun SongRow(song: Song, highlighted: Boolean, onClick: () -> Unit) {
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Artwork(song.art, Modifier.size(56.dp), corner = 6.dp)
+        Artwork(song.art, Modifier.size(56.dp), corner = 6.dp, imageUrl = song.thumbnail)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(
@@ -196,7 +213,7 @@ fun SongRow(song: Song, highlighted: Boolean, onClick: () -> Unit) {
 fun AlbumCard(album: Album, size: Dp = 150.dp) {
     val c = AppTheme.colors
     Column(Modifier.width(size)) {
-        Artwork(album.art, Modifier.size(size), corner = 10.dp)
+        Artwork(album.art, Modifier.size(size), corner = 10.dp, imageUrl = album.thumbnail)
         Spacer(Modifier.height(8.dp))
         Text(
             album.title,
@@ -242,7 +259,7 @@ fun MiniPlayer(
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Artwork(song.art, Modifier.size(48.dp), corner = 8.dp)
+        Artwork(song.art, Modifier.size(48.dp), corner = 8.dp, imageUrl = song.thumbnail)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(
@@ -253,7 +270,13 @@ fun MiniPlayer(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(song.artist, color = c.textSecondary, fontSize = 15.sp, maxLines = 1)
+            Text(
+                song.artist,
+                color = c.textSecondary,
+                fontSize = 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         Icon(
             if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
