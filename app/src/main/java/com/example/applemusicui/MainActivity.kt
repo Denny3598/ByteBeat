@@ -21,25 +21,59 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.applemusicui.data.YouTubeMusicRepository
 import com.example.applemusicui.ui.NowPlayingScreen
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        val repository = YouTubeMusicRepository()
+
         setContent {
             MaterialTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
+                    val scope = rememberCoroutineScope()
+
                     var isNowPlayingOpen by remember { mutableStateOf(false) }
                     var isPlaying by remember { mutableStateOf(false) }
+                    
+                    var songTitle by remember { mutableStateOf("Mencari lagu...") }
+                    var songArtist by remember { mutableStateOf("YouTube Music") }
+                    var coverUrl by remember { mutableStateOf("") }
 
-                    val songTitle = "Alcohol-Free"
-                    val songArtist = "TWICE"
-                    val albumType = "Mini Album"
-                    val coverUrl = "https://example.com/album_art.jpg"
+                    // Ambil data lagu dari YouTube Music di background thread
+                    LaunchedEffect(Unit) {
+                        scope.launch(Dispatchers.IO) {
+                            try {
+                                val songs = repository.searchSongs("TWICE Alcohol Free")
+                                val song = songs.firstOrNull()
+                                
+                                withContext(Dispatchers.Main) {
+                                    if (song != null) {
+                                        songTitle = song.title
+                                        songArtist = song.artist
+                                        coverUrl = song.thumbnailUrl
+                                    } else {
+                                        songTitle = "Alcohol-Free"
+                                        songArtist = "TWICE"
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    songTitle = "Alcohol-Free"
+                                    songArtist = "TWICE"
+                                }
+                            }
+                        }
+                    }
 
                     Box(modifier = Modifier.fillMaxSize()) {
                         
@@ -113,7 +147,7 @@ class MainActivity : ComponentActivity() {
                             NowPlayingScreen(
                                 title = songTitle,
                                 artist = songArtist,
-                                albumType = albumType,
+                                albumType = "YouTube Music",
                                 imageUrl = coverUrl,
                                 isPlaying = isPlaying,
                                 onPlayPauseToggle = { isPlaying = !isPlaying },
