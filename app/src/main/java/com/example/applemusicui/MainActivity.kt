@@ -43,26 +43,26 @@ class MainActivity : ComponentActivity() {
                     var isNowPlayingOpen by remember { mutableStateOf(false) }
                     var isPlaying by remember { mutableStateOf(false) }
                     
-                    var title by remember { mutableStateOf("Alcohol-Free") }
-                    var artist by remember { mutableStateOf("TWICE") }
-                    var imageUrl by remember { mutableStateOf("") }
+                    var songTitle by remember { mutableStateOf("Alcohol-Free") }
+                    var songArtist by remember { mutableStateOf("TWICE") }
+                    var coverUrl by remember { mutableStateOf("") }
 
-                    // Mengambil data dari repository YouTube saat aplikasi terbuka
+                    // Mengambil data lagu dari YouTube Music
                     LaunchedEffect(Unit) {
                         scope.launch {
                             try {
                                 val songs = repository.searchSongs("TWICE Alcohol Free")
                                 val song = songs.firstOrNull()
                                 if (song != null) {
-                                    title = song.title
-                                    artist = song.artist
-                                    imageUrl = song.thumbnailUrl
+                                    songTitle = song.title
+                                    songArtist = song.artist
+                                    coverUrl = song.thumbnailUrl
                                     isPlaying = true
                                 }
                             } catch (e: Exception) {
-                                // Fallback jika koneksi/scraping gagal
-                                title = "Alcohol-Free"
-                                artist = "TWICE"
+                                // Fallback jika gagal scraping/koneksi
+                                songTitle = "Alcohol-Free"
+                                songArtist = "TWICE"
                             }
                         }
                     }
@@ -106,12 +106,12 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = title,
+                                            text = songTitle,
                                             color = Color.White,
                                             fontSize = 14.sp
                                         )
                                         Text(
-                                            text = artist,
+                                            text = songArtist,
                                             color = Color.Gray,
                                             fontSize = 12.sp
                                         )
@@ -137,10 +137,10 @@ class MainActivity : ComponentActivity() {
                             exit = slideOutVertically(targetOffsetY = { it })
                         ) {
                             NowPlayingScreen(
-                                title = title,
-                                artist = artist,
+                                title = songTitle,
+                                artist = songArtist,
                                 albumType = "Mini Album",
-                                imageUrl = imageUrl,
+                                imageUrl = coverUrl,
                                 isPlaying = isPlaying,
                                 onPlayPauseToggle = { isPlaying = !isPlaying },
                                 onDismiss = { isNowPlayingOpen = false }
