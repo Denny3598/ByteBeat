@@ -2,10 +2,21 @@ package com.example.applemusicui.data
 
 import androidx.compose.ui.graphics.Color
 
-/** Warna gradien dipakai sebagai pengganti cover art (data dummy, tanpa jaringan). */
-data class Song(val title: String, val artist: String, val art: List<Color>)
+/** art = warna gradien cadangan; thumbnail = alamat cover asli (kalau ada). */
+data class Song(
+    val title: String,
+    val artist: String,
+    val art: List<Color>,
+    val url: String = "",
+    val thumbnail: String? = null,
+)
 
-data class Album(val title: String, val subtitle: String, val art: List<Color>)
+data class Album(
+    val title: String,
+    val subtitle: String,
+    val art: List<Color>,
+    val thumbnail: String? = null,
+)
 
 data class Mood(val title: String, val subtitle: String, val base: Color, val art: List<Color>)
 
@@ -55,6 +66,7 @@ object DummyData {
         mood("Afrika", "Afro Hits", 0xFF0F7A1F),
     )
 }
+
 data class RecentSearch(val title: String, val subtitle: String, val art: List<Color>)
 
 val defaultRecentSearches = listOf(
