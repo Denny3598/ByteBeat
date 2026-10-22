@@ -27,9 +27,14 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,9 +49,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.applemusicui.data.Album
 import com.example.applemusicui.data.Song
+import com.example.applemusicui.ui.theme.AppTheme
 import com.example.applemusicui.ui.theme.AppleRed
-import com.example.applemusicui.ui.theme.GlassDark
-import com.example.applemusicui.ui.theme.TextSecondary
+import com.example.applemusicui.ui.theme.ThemeMode
+
+/** Dipanggil saat avatar ditekan (membuka dialog pilihan tema). */
+val LocalOnAvatarClick = staticCompositionLocalOf<() -> Unit> { {} }
 
 /** Cover art placeholder berupa gradien. */
 @Composable
@@ -59,21 +67,24 @@ fun Artwork(colors: List<Color>, modifier: Modifier = Modifier, corner: Dp = 8.d
 }
 
 @Composable
-fun Avatar(modifier: Modifier = Modifier) {
+fun Avatar(modifier: Modifier = Modifier, size: Dp = 46.dp) {
+    val c = AppTheme.colors
+    val onClick = LocalOnAvatarClick.current
     Box(
         modifier
-            .size(46.dp)
+            .size(size)
             .border(2.dp, AppleRed, CircleShape)
             .padding(4.dp)
             .clip(CircleShape)
-            .background(Brush.linearGradient(listOf(Color(0xFF4A4A4A), Color(0xFF111111)))),
+            .clickable(onClick = onClick)
+            .background(Brush.linearGradient(listOf(c.textSecondary, c.surface))),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             Icons.Filled.Person,
-            contentDescription = null,
-            tint = Color.White.copy(alpha = 0.7f),
-            modifier = Modifier.size(22.dp),
+            contentDescription = "Pengaturan tampilan",
+            tint = c.text.copy(alpha = 0.7f),
+            modifier = Modifier.size(size / 2),
         )
     }
 }
@@ -86,6 +97,7 @@ fun ScreenHeader(
     horizontalPadding: Dp = 20.dp,
     trailing: @Composable () -> Unit = {},
 ) {
+    val c = AppTheme.colors
     Row(
         modifier
             .fillMaxWidth()
@@ -95,7 +107,7 @@ fun ScreenHeader(
     ) {
         Text(
             title,
-            color = Color.White,
+            color = c.text,
             fontSize = 36.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = (-0.5).sp,
@@ -108,7 +120,14 @@ fun ScreenHeader(
 }
 
 @Composable
-fun SectionHeader(title: String, modifier: Modifier = Modifier, action: String? = "Lihat Semua") {
+fun SectionHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    action: String? = "Lihat Semua",
+    actionColor: Color = AppleRed,
+    onActionClick: (() -> Unit)? = null,
+) {
+    val c = AppTheme.colors
     Row(
         modifier
             .fillMaxWidth()
@@ -117,19 +136,27 @@ fun SectionHeader(title: String, modifier: Modifier = Modifier, action: String? 
     ) {
         Text(
             title,
-            color = Color.White,
+            color = c.text,
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f),
         )
         if (action != null) {
-            Text(action, color = AppleRed, fontSize = 16.sp)
+            Text(
+                action,
+                color = actionColor,
+                fontSize = 16.sp,
+                modifier = Modifier.clickable(enabled = onActionClick != null) {
+                    onActionClick?.invoke()
+                },
+            )
         }
     }
 }
 
 @Composable
 fun SongRow(song: Song, highlighted: Boolean, onClick: () -> Unit) {
+    val c = AppTheme.colors
     Row(
         Modifier
             .fillMaxWidth()
@@ -142,7 +169,7 @@ fun SongRow(song: Song, highlighted: Boolean, onClick: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(
                 song.title,
-                color = if (highlighted) AppleRed else Color.White,
+                color = if (highlighted) AppleRed else c.text,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
@@ -150,7 +177,7 @@ fun SongRow(song: Song, highlighted: Boolean, onClick: () -> Unit) {
             )
             Text(
                 song.artist,
-                color = TextSecondary,
+                color = c.textSecondary,
                 fontSize = 15.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -159,7 +186,7 @@ fun SongRow(song: Song, highlighted: Boolean, onClick: () -> Unit) {
         Icon(
             Icons.Filled.MoreVert,
             contentDescription = "Opsi",
-            tint = TextSecondary,
+            tint = c.textSecondary,
             modifier = Modifier.size(20.dp),
         )
     }
@@ -167,12 +194,13 @@ fun SongRow(song: Song, highlighted: Boolean, onClick: () -> Unit) {
 
 @Composable
 fun AlbumCard(album: Album, size: Dp = 150.dp) {
+    val c = AppTheme.colors
     Column(Modifier.width(size)) {
         Artwork(album.art, Modifier.size(size), corner = 10.dp)
         Spacer(Modifier.height(8.dp))
         Text(
             album.title,
-            color = Color.White,
+            color = c.text,
             fontSize = 15.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
@@ -180,7 +208,7 @@ fun AlbumCard(album: Album, size: Dp = 150.dp) {
         )
         Text(
             album.subtitle,
-            color = TextSecondary,
+            color = c.textSecondary,
             fontSize = 14.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -188,7 +216,7 @@ fun AlbumCard(album: Album, size: Dp = 150.dp) {
     }
 }
 
-/** Mini player melayang dengan efek "kaca" gelap + semburat warna cover. */
+/** Mini player melayang dengan semburat warna cover. */
 @Composable
 fun MiniPlayer(
     song: Song,
@@ -197,19 +225,20 @@ fun MiniPlayer(
     onNext: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val c = AppTheme.colors
     val shape = RoundedCornerShape(32.dp)
     Row(
         modifier
             .fillMaxWidth()
             .height(68.dp)
             .clip(shape)
-            .background(Color(0xFF121212))
+            .background(c.surface)
             .background(
                 Brush.horizontalGradient(
-                    listOf(GlassDark, song.art.first().copy(alpha = 0.30f))
+                    listOf(Color.Transparent, song.art.first().copy(alpha = 0.30f))
                 )
             )
-            .border(1.dp, Color.White.copy(alpha = 0.08f), shape)
+            .border(1.dp, c.glassBorder, shape)
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -218,18 +247,18 @@ fun MiniPlayer(
         Column(Modifier.weight(1f)) {
             Text(
                 song.title,
-                color = Color.White,
+                color = c.text,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(song.artist, color = TextSecondary, fontSize = 15.sp, maxLines = 1)
+            Text(song.artist, color = c.textSecondary, fontSize = 15.sp, maxLines = 1)
         }
         Icon(
             if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
             contentDescription = "Putar/jeda",
-            tint = AppleRed,
+            tint = c.control,
             modifier = Modifier
                 .size(44.dp)
                 .clip(CircleShape)
@@ -239,7 +268,7 @@ fun MiniPlayer(
         Icon(
             Icons.Filled.FastForward,
             contentDescription = "Berikutnya",
-            tint = AppleRed,
+            tint = c.control,
             modifier = Modifier
                 .size(44.dp)
                 .clip(CircleShape)
@@ -256,17 +285,18 @@ enum class AppTab(val label: String, val icon: ImageVector) {
     Search("Search", Icons.Filled.Search),
 }
 
-/** Tab bar berbentuk pil melayang; tab aktif diberi highlight + warna merah. */
+/** Tab bar berbentuk pil melayang; tab aktif diberi highlight. */
 @Composable
 fun PillTabBar(selected: AppTab, onSelect: (AppTab) -> Unit, modifier: Modifier = Modifier) {
+    val c = AppTheme.colors
     val barShape = RoundedCornerShape(36.dp)
     Row(
         modifier
             .fillMaxWidth()
             .height(72.dp)
             .clip(barShape)
-            .background(GlassDark)
-            .border(1.dp, Color.White.copy(alpha = 0.08f), barShape)
+            .background(c.glass)
+            .border(1.dp, c.glassBorder, barShape)
             .padding(6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -277,7 +307,7 @@ fun PillTabBar(selected: AppTab, onSelect: (AppTab) -> Unit, modifier: Modifier 
                     .weight(1f)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(30.dp))
-                    .background(if (isSelected) Color.White.copy(alpha = 0.12f) else Color.Transparent)
+                    .background(if (isSelected) c.selectedPill else Color.Transparent)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -288,16 +318,56 @@ fun PillTabBar(selected: AppTab, onSelect: (AppTab) -> Unit, modifier: Modifier 
                 Icon(
                     tab.icon,
                     contentDescription = tab.label,
-                    tint = if (isSelected) AppleRed else TextSecondary,
+                    tint = if (isSelected) c.control else c.textSecondary,
                     modifier = Modifier.size(26.dp),
                 )
                 Text(
                     tab.label,
-                    color = if (isSelected) AppleRed else TextSecondary,
+                    color = if (isSelected) c.control else c.textSecondary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                 )
             }
         }
     }
+}
+
+/** Dialog pilihan tema: Ikuti sistem / Terang / Gelap. */
+@Composable
+fun ThemeDialog(current: ThemeMode, onSelect: (ThemeMode) -> Unit, onDismiss: () -> Unit) {
+    val c = AppTheme.colors
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.surface,
+        titleContentColor = c.text,
+        textContentColor = c.text,
+        title = { Text("Tampilan") },
+        text = {
+            Column {
+                ThemeMode.entries.forEach { mode ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { onSelect(mode) }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = mode == current,
+                            onClick = { onSelect(mode) },
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = AppleRed,
+                                unselectedColor = c.textSecondary,
+                            ),
+                        )
+                        Text(mode.label, color = c.text, fontSize = 17.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Selesai", color = AppleRed) }
+        },
+    )
 }
