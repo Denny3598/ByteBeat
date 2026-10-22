@@ -39,7 +39,7 @@ jobs:
         run: |
           gh release delete latest --cleanup-tag --yes || true
           gh release create latest out/ByteBeat.apk \
-            --title 'ByteBeat APK Terbaru' \
+            --title 'ByteBeat latest app' \
             --notes "Build otomatis dari commit ${GITHUB_SHA:0:7}" \
             --target "$GITHUB_SHA"
             
