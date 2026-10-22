@@ -55,3 +55,15 @@ object DummyData {
         mood("Afrika", "Afro Hits", 0xFF0F7A1F),
     )
 }
+data class RecentSearch(val title: String, val subtitle: String, val art: List<Color>)
+
+val defaultRecentSearches = listOf(
+    RecentSearch("Petualangan Sherina", "Album • Sherina • 2000", listOf(Color(0xFF3B1E1E), Color(0xFFE8A33D))),
+    RecentSearch("Rossa", "Artist • 12.5M monthly audience", listOf(Color(0xFFF2A33A), Color(0xFFD9622B))),
+    RecentSearch("Afgan", "Artist • 11.9M monthly audience", listOf(Color(0xFF8E8E93), Color(0xFF3A3A3C))),
+    RecentSearch("Katy Perry", "Artist • 244M monthly audience", listOf(Color(0xFFB07CF6), Color(0xFFFF8FB8))),
+    RecentSearch("ATEEZ", "Artist • 112M monthly audience", listOf(Color(0xFF5A5A5A), Color(0xFFBDBDBD))),
+    RecentSearch("BABYMONSTER", "Artist • 72.4M monthly audience", listOf(Color(0xFF9FB4C7), Color(0xFFE6D3DD))),
+    RecentSearch("BLACKPINK", "Artist • 187M monthly audience", listOf(Color(0xFF1B1B1F), Color(0xFF6B6B78))),
+    RecentSearch("BTS", "Artist • 186M monthly audience", listOf(Color(0xFF2B2B2B), Color(0xFFD0D0D0))),
+)
