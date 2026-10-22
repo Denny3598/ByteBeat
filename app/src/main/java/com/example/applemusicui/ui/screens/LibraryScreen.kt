@@ -39,17 +39,18 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.applemusicui.data.DummyData
 import com.example.applemusicui.ui.components.AlbumCard
 import com.example.applemusicui.ui.components.ScreenHeader
 import com.example.applemusicui.ui.components.SectionHeader
-import com.example.applemusicui.ui.theme.SurfaceDark
-import com.example.applemusicui.ui.theme.TextSecondary
+import com.example.applemusicui.ui.theme.AppTheme
 
 @Composable
 fun LibraryScreen() {
+    val c = AppTheme.colors
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
 
     LazyColumn(
@@ -60,7 +61,7 @@ fun LibraryScreen() {
     ) {
         item {
             ScreenHeader("Perpustakaan") {
-                Icon(Icons.Filled.History, contentDescription = "Riwayat", tint = Color.White)
+                Icon(Icons.Filled.History, contentDescription = "Riwayat", tint = c.text)
             }
         }
 
@@ -98,8 +99,8 @@ fun LibraryScreen() {
             Column(Modifier.padding(top = 16.dp)) {
                 LibraryRow(Icons.Filled.Download, "Downloads")
                 HorizontalDivider(
-                    Modifier.padding(start = 62.dp, end = 0.dp),
-                    color = Color.White.copy(alpha = 0.12f),
+                    Modifier.padding(start = 62.dp),
+                    color = c.divider,
                 )
                 LibraryRow(Icons.Filled.Folder, "Local Music")
             }
@@ -136,9 +137,10 @@ fun LibraryScreen() {
     }
 }
 
+/** Kartu statistik: tetap gelap di kedua tema, seperti kartu Apple Music. */
 @Composable
 private fun StatCard(
-    width: androidx.compose.ui.unit.Dp,
+    width: Dp,
     value: String,
     label: String,
     footerTitle: String,
@@ -198,16 +200,17 @@ private fun StatCard(
 
 @Composable
 private fun LibraryRow(icon: ImageVector, label: String) {
+    val c = AppTheme.colors
     Row(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(26.dp))
+        Icon(icon, contentDescription = null, tint = c.text, modifier = Modifier.size(26.dp))
         Spacer(Modifier.width(16.dp))
-        Text(label, color = Color.White, fontSize = 19.sp, modifier = Modifier.weight(1f))
-        Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = TextSecondary)
+        Text(label, color = c.text, fontSize = 19.sp, modifier = Modifier.weight(1f))
+        Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = c.textSecondary)
     }
 }
 
@@ -218,6 +221,7 @@ private fun PlaylistTile(
     subtitle: String,
     gradient: List<Color>? = null,
 ) {
+    val c = AppTheme.colors
     Column(Modifier.width(130.dp)) {
         Box(
             Modifier
@@ -225,16 +229,21 @@ private fun PlaylistTile(
                 .clip(RoundedCornerShape(14.dp))
                 .background(
                     if (gradient != null) Brush.linearGradient(gradient)
-                    else Brush.linearGradient(listOf(SurfaceDark, SurfaceDark))
+                    else Brush.linearGradient(listOf(c.surface, c.surface))
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(40.dp))
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = if (gradient != null) Color.White else c.text,
+                modifier = Modifier.size(40.dp),
+            )
         }
         Spacer(Modifier.height(8.dp))
         Text(
             title,
-            color = Color.White,
+            color = c.text,
             fontSize = 15.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
@@ -242,7 +251,7 @@ private fun PlaylistTile(
         )
         Text(
             subtitle,
-            color = TextSecondary,
+            color = c.textSecondary,
             fontSize = 14.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
