@@ -38,7 +38,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest --cleanup-tag --yes || true
-          gh release create latest out/app-debug.apk \
-            --title "Debug APK terbaru" \
+          gh release create latest out/ByteBeat.apk \
+            --title "ByteBeat Lates Update" \
             --notes "Build otomatis dari commit ${GITHUB_SHA::7}" \
             --target "$GITHUB_SHA"
