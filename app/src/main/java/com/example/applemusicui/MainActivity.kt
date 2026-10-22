@@ -47,7 +47,6 @@ class MainActivity : ComponentActivity() {
                     var songArtist by remember { mutableStateOf("YouTube Music") }
                     var coverUrl by remember { mutableStateOf("") }
 
-                    // Memanggil object YouTubeMusicRepository langsung tanpa tanda ()
                     LaunchedEffect(Unit) {
                         scope.launch(Dispatchers.IO) {
                             try {
@@ -58,7 +57,7 @@ class MainActivity : ComponentActivity() {
                                     if (song != null) {
                                         songTitle = song.title
                                         songArtist = song.artist
-                                        coverUrl = song.cover // Menggunakan properti 'cover'
+                                        coverUrl = song.thumbnail // Menggunakan properti 'thumbnail'
                                     } else {
                                         songTitle = "Alcohol-Free"
                                         songArtist = "TWICE"
