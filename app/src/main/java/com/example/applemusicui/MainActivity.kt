@@ -1,52 +1,136 @@
-package com.example.applemusicui
+package com.denny.bytebeat
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import com.example.applemusicui.ui.AppRoot
-import com.example.applemusicui.ui.theme.AppleMusicTheme
-import com.example.applemusicui.ui.theme.ThemeMode
-import com.example.applemusicui.ui.theme.ThemePrefs
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.denny.bytebeat.ui.screens.NowPlayingScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            var mode by remember { mutableStateOf(ThemePrefs.load(this@MainActivity)) }
-            val dark = when (mode) {
-                ThemeMode.System -> isSystemInDarkTheme()
-                ThemeMode.Light -> false
-                ThemeMode.Dark -> true
-            }
+            MaterialTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    // --- STATE APLIKASI ---
+                    var isNowPlayingOpen by remember { mutableStateOf(false) }
+                    var isPlaying by remember { mutableStateOf(false) }
 
-            // Warna ikon status bar & navigation bar mengikuti tema.
-            DisposableEffect(dark) {
-                val transparent = android.graphics.Color.TRANSPARENT
-                val style = if (dark) {
-                    SystemBarStyle.dark(transparent)
-                } else {
-                    SystemBarStyle.light(transparent, transparent)
+                    // Data DUMMY (Nanti bisa diganti dengan data dari Player/ViewModel)
+                    val currentTrackTitle = "Alcohol-Free"
+                    val currentArtist = "TWICE"
+                    val currentAlbumType = "Mini Album"
+                    val currentCoverUrl = "https://example.com/album_art.jpg"
+
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        
+                        // ==========================================
+                        // 1. KONTEN UTAMA (HOME / DASHBOARD)
+                        // ==========================================
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "Selamat Datang di ByteBeat",
+                                style = MaterialTheme.typography.headlineMedium
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(onClick = { isNowPlayingOpen = true }) {
+                                Text("Buka Full Screen Player")
+                            }
+                        }
+
+                        // ==========================================
+                        // 2. MINI PLAYER (BOTTOM BAR)
+                        // Tampil jika Player sedang tidak di-expand
+                        // ==========================================
+                        if (!isNowPlayingOpen) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(horizontal = 12.dp, vertical = 16.dp)
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFF222222))
+                                    .clickable { isNowPlayingOpen = true }
+                                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = currentTrackTitle,
+                                            color = Color.White,
+                                            fontSize = 14.sp
+                                        )
+                                        Text(
+                                            text = currentArtist,
+                                            color = Color.Gray,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = { isPlaying = !isPlaying }
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                            contentDescription = "Play/Pause",
+                                            tint = Color.White
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // ==========================================
+                        // 3. FULL SCREEN NOW PLAYING (SLIDE UP)
+                        // ==========================================
+                        AnimatedVisibility(
+                            visible = isNowPlayingOpen,
+                            enter = slideInVertically(initialOffsetY = { it }),
+                            exit = slideOutVertically(targetOffsetY = { it })
+                        ) {
+                            NowPlayingScreen(
+                                title = currentTrackTitle,
+                                artist = currentArtist,
+                                albumType = currentAlbumType,
+                                imageUrl = currentCoverUrl,
+                                isPlaying = isPlaying,
+                                onPlayPauseToggle = { isPlaying = !isPlaying },
+                                onDismiss = { isNowPlayingOpen = false }
+                            )
+                        }
+
+                    }
                 }
-                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
-                onDispose { }
-            }
-
-            AppleMusicTheme(darkTheme = dark) {
-                AppRoot(
-                    themeMode = mode,
-                    onThemeModeChange = {
-                        mode = it
-                        ThemePrefs.save(this@MainActivity, it)
-                    },
-                )
             }
         }
     }
