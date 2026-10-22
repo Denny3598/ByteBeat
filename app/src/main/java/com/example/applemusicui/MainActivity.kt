@@ -21,6 +21,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
 import com.example.applemusicui.data.YouTubeMusicRepository
 import com.example.applemusicui.ui.NowPlayingScreen
 import kotlinx.coroutines.Dispatchers
@@ -29,8 +31,13 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
 
+    private var player: ExoPlayer? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Inisialisasi ExoPlayer untuk pemutaran audio
+        player = ExoPlayer.Builder(this).build()
 
         setContent {
             MaterialTheme {
@@ -42,23 +49,41 @@ class MainActivity : ComponentActivity() {
 
                     var isNowPlayingOpen by remember { mutableStateOf(false) }
                     var isPlaying by remember { mutableStateOf(false) }
-                    
+
                     var songTitle by remember { mutableStateOf("Mencari lagu...") }
                     var songArtist by remember { mutableStateOf("YouTube Music") }
                     var coverUrl by remember { mutableStateOf("") }
 
+                    // Integrasi YouTube Music + Audio Playback Sekaligus
                     LaunchedEffect(Unit) {
                         scope.launch(Dispatchers.IO) {
                             try {
                                 val songs = YouTubeMusicRepository.searchSongs("TWICE Alcohol Free")
                                 val song = songs.firstOrNull()
-                                
-                                withContext(Dispatchers.Main) {
-                                    if (song != null) {
+
+                                if (song != null) {
+                                    // Mengambil URL stream audio langsung
+                                    val audioStreamUrl = try {
+                                        YouTubeMusicRepository.audioUrl(song.url)
+                                    } catch (e: Exception) {
+                                        ""
+                                    }
+
+                                    withContext(Dispatchers.Main) {
                                         songTitle = song.title
                                         songArtist = song.artist
-                                        coverUrl = song.thumbnail // Menggunakan properti 'thumbnail'
-                                    } else {
+                                        coverUrl = song.thumbnail ?: "" // Penanganan Null Safety (String? -> String)
+
+                                        if (audioStreamUrl.isNotEmpty()) {
+                                            val mediaItem = MediaItem.fromUri(audioStreamUrl)
+                                            player?.setMediaItem(mediaItem)
+                                            player?.prepare()
+                                            player?.play()
+                                            isPlaying = true
+                                        }
+                                    }
+                                } else {
+                                    withContext(Dispatchers.Main) {
                                         songTitle = "Alcohol-Free"
                                         songArtist = "TWICE"
                                     }
@@ -73,7 +98,7 @@ class MainActivity : ComponentActivity() {
                     }
 
                     Box(modifier = Modifier.fillMaxSize()) {
-                        
+
                         // KONTEN UTAMA
                         Column(
                             modifier = Modifier
@@ -123,7 +148,10 @@ class MainActivity : ComponentActivity() {
                                     }
 
                                     IconButton(
-                                        onClick = { isPlaying = !isPlaying }
+                                        onClick = {
+                                            isPlaying = !isPlaying
+                                            if (isPlaying) player?.play() else player?.pause()
+                                        }
                                     ) {
                                         Icon(
                                             imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
@@ -147,7 +175,10 @@ class MainActivity : ComponentActivity() {
                                 albumType = "YouTube Music",
                                 imageUrl = coverUrl,
                                 isPlaying = isPlaying,
-                                onPlayPauseToggle = { isPlaying = !isPlaying },
+                                onPlayPauseToggle = {
+                                    isPlaying = !isPlaying
+                                    if (isPlaying) player?.play() else player?.pause()
+                                },
                                 onDismiss = { isNowPlayingOpen = false }
                             )
                         }
@@ -156,5 +187,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        player?.release()
+        player = null
     }
 }
