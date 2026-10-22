@@ -21,51 +21,25 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.applemusicui.data.YouTubeMusicRepository
 import com.example.applemusicui.ui.NowPlayingScreen
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        val repository = YouTubeMusicRepository()
-
         setContent {
             MaterialTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val scope = rememberCoroutineScope()
-
                     var isNowPlayingOpen by remember { mutableStateOf(false) }
                     var isPlaying by remember { mutableStateOf(false) }
-                    
-                    var songTitle by remember { mutableStateOf("Alcohol-Free") }
-                    var songArtist by remember { mutableStateOf("TWICE") }
-                    var coverUrl by remember { mutableStateOf("") }
 
-                    // Mengambil data lagu dari YouTube Music
-                    LaunchedEffect(Unit) {
-                        scope.launch {
-                            try {
-                                val songs = repository.searchSongs("TWICE Alcohol Free")
-                                val song = songs.firstOrNull()
-                                if (song != null) {
-                                    songTitle = song.title
-                                    songArtist = song.artist
-                                    coverUrl = song.thumbnailUrl
-                                    isPlaying = true
-                                }
-                            } catch (e: Exception) {
-                                // Fallback jika gagal scraping/koneksi
-                                songTitle = "Alcohol-Free"
-                                songArtist = "TWICE"
-                            }
-                        }
-                    }
+                    val songTitle = "Alcohol-Free"
+                    val songArtist = "TWICE"
+                    val albumType = "Mini Album"
+                    val coverUrl = "https://example.com/album_art.jpg"
 
                     Box(modifier = Modifier.fillMaxSize()) {
                         
@@ -139,7 +113,7 @@ class MainActivity : ComponentActivity() {
                             NowPlayingScreen(
                                 title = songTitle,
                                 artist = songArtist,
-                                albumType = "Mini Album",
+                                albumType = albumType,
                                 imageUrl = coverUrl,
                                 isPlaying = isPlaying,
                                 onPlayPauseToggle = { isPlaying = !isPlaying },
