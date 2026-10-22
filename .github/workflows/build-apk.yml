@@ -31,7 +31,7 @@ jobs:
           cd "$(dirname "$(find . -name settings.gradle.kts -not -path './.git/*' | head -1)")"
           gradle assembleDebug --no-daemon
           mkdir -p "$GITHUB_WORKSPACE/out"
-          cp app/build/outputs/apk/debug/*.apk "$GITHUB_WORKSPACE/out/"
+          cp app/build/outputs/apk/debug/*.apk "$GITHUB_WORKSPACE/out/ByteBeat.apk"
 
       - name: Publish APK to Releases
         env:
@@ -39,6 +39,7 @@ jobs:
         run: |
           gh release delete latest --cleanup-tag --yes || true
           gh release create latest out/ByteBeat.apk \
-            --title "ByteBeat Lates Update" \
-            --notes "Build otomatis dari commit ${GITHUB_SHA::7}" \
+            --title 'ByteBeat APK Terbaru' \
+            --notes "Build otomatis dari commit ${GITHUB_SHA:0:7}" \
             --target "$GITHUB_SHA"
+            
