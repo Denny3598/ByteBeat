@@ -31,8 +31,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        val repository = YouTubeMusicRepository()
 
         setContent {
             MaterialTheme {
@@ -49,18 +47,18 @@ class MainActivity : ComponentActivity() {
                     var songArtist by remember { mutableStateOf("YouTube Music") }
                     var coverUrl by remember { mutableStateOf("") }
 
-                    // Ambil data lagu dari YouTube Music di background thread
+                    // Memanggil object YouTubeMusicRepository langsung tanpa tanda ()
                     LaunchedEffect(Unit) {
                         scope.launch(Dispatchers.IO) {
                             try {
-                                val songs = repository.searchSongs("TWICE Alcohol Free")
+                                val songs = YouTubeMusicRepository.searchSongs("TWICE Alcohol Free")
                                 val song = songs.firstOrNull()
                                 
                                 withContext(Dispatchers.Main) {
                                     if (song != null) {
                                         songTitle = song.title
                                         songArtist = song.artist
-                                        coverUrl = song.thumbnailUrl
+                                        coverUrl = song.cover // Menggunakan properti 'cover'
                                     } else {
                                         songTitle = "Alcohol-Free"
                                         songArtist = "TWICE"
