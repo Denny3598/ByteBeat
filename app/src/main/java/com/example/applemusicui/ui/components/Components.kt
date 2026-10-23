@@ -1,11 +1,18 @@
 package com.example.applemusicui.ui.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -42,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -70,7 +79,7 @@ fun Artwork(
     Box(
         modifier
             .clip(RoundedCornerShape(corner))
-            .background(Brush.linearGradient(colors))
+            .background(Brush.linearGradient(colors)),
     ) {
         if (!imageUrl.isNullOrBlank()) {
             AsyncImage(
@@ -252,8 +261,8 @@ fun MiniPlayer(
             .background(c.surface)
             .background(
                 Brush.horizontalGradient(
-                    listOf(Color.Transparent, song.art.first().copy(alpha = 0.30f))
-                )
+                    listOf(Color.Transparent, song.art.first().copy(alpha = 0.30f)),
+                ),
             )
             .border(1.dp, c.glassBorder, shape)
             .padding(horizontal = 10.dp),
@@ -308,12 +317,15 @@ enum class AppTab(val label: String, val icon: ImageVector) {
     Search("Search", Icons.Filled.Search),
 }
 
-/** Tab bar berbentuk pil melayang; tab aktif diberi highlight. */
+/** Tab bar berbentuk pil; pil aktif meluncur ke tab yang dipilih, dan ikonnya membesar. */
 @Composable
 fun PillTabBar(selected: AppTab, onSelect: (AppTab) -> Unit, modifier: Modifier = Modifier) {
     val c = AppTheme.colors
     val barShape = RoundedCornerShape(36.dp)
-    Row(
+    val tabs = AppTab.entries
+    val selectedIndex = tabs.indexOf(selected).coerceAtLeast(0)
+
+    BoxWithConstraints(
         modifier
             .fillMaxWidth()
             .height(72.dp)
@@ -321,37 +333,78 @@ fun PillTabBar(selected: AppTab, onSelect: (AppTab) -> Unit, modifier: Modifier 
             .background(c.glass)
             .border(1.dp, c.glassBorder, barShape)
             .padding(6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        AppTab.entries.forEach { tab ->
-            val isSelected = tab == selected
-            Column(
-                Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(30.dp))
-                    .background(if (isSelected) c.selectedPill else Color.Transparent)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onSelect(tab) },
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Icon(
-                    tab.icon,
-                    contentDescription = tab.label,
-                    tint = if (isSelected) c.control else c.textSecondary,
-                    modifier = Modifier.size(26.dp),
-                )
-                Text(
-                    tab.label,
-                    color = if (isSelected) c.control else c.textSecondary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
+        val tabWidth = maxWidth / tabs.size
+        val indicatorX by animateDpAsState(
+            targetValue = tabWidth * selectedIndex,
+            animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
+            label = "tabIndicator",
+        )
+
+        // Pil aktif yang meluncur
+        Box(
+            Modifier
+                .offset(x = indicatorX)
+                .width(tabWidth)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(30.dp))
+                .background(c.selectedPill),
+        )
+
+        Row(Modifier.fillMaxSize()) {
+            tabs.forEach { tab ->
+                TabItem(
+                    tab = tab,
+                    selected = tab == selected,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSelect(tab) },
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun TabItem(tab: AppTab, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val c = AppTheme.colors
+    val tint by animateColorAsState(
+        targetValue = if (selected) c.control else c.textSecondary,
+        animationSpec = tween(durationMillis = 250),
+        label = "tabTint",
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1.08f else 1f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium),
+        label = "tabScale",
+    )
+    Column(
+        modifier = modifier
+            .fillMaxHeight()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            ),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            tab.icon,
+            contentDescription = tab.label,
+            tint = tint,
+            modifier = Modifier
+                .size(26.dp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                },
+        )
+        Text(
+            tab.label,
+            color = tint,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 
