@@ -20,9 +20,13 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build Release APK with Gradle
+      - name: Build Signed Release APK
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          ALIAS: ${{ secrets.ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          # Cari lokasi gradlew secara otomatis lalu jalankan build
           if [ -f "./gradlew" ]; then
             chmod +x gradlew
             ./gradlew assembleRelease
@@ -32,30 +36,9 @@ jobs:
             ./gradlew assembleRelease
           fi
 
-      - name: Sign APK with Native Android Tools
-        env:
-          SIGNING_KEY_BASE64: ${{ secrets.SIGNING_KEY }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          echo "$SIGNING_KEY_BASE64" | base64 -d > release.keystore
-          
-          # Cari lokasi file APK yang berhasil di-build
-          APK_PATH=$(find . -type f -name "app-release-unsigned.apk" | head -n 1)
-          
-          # Sign APK menggunakan apksigner resmi
-          $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
-            --ks release.keystore \
-            --ks-pass pass:"$KEYSTORE_PASSWORD" \
-            --ks-key-alias "$KEY_ALIAS" \
-            --key-pass pass:"$KEY_PASSWORD" \
-            --out ByteBeat-Signed.apk \
-            "$APK_PATH"
-
       - name: Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
           name: ByteBeat-Release
-          path: ByteBeat-Signed.apk
+          path: "**/app/build/outputs/apk/release/*.apk"
           
