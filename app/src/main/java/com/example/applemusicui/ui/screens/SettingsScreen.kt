@@ -1,319 +1,360 @@
 package com.example.applemusicui.ui.screens
 
+import android.content.SharedPreferences
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Brightness6
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.SignalCellularAlt
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.applemusicui.data.AppPrefs
+import com.example.applemusicui.ui.theme.AppTheme
+import com.example.applemusicui.ui.theme.ThemeMode
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onBackClick: () -> Unit,
-    onLoginClick: () -> Unit
+    themeMode: ThemeMode,
+    onThemeModeChange: (ThemeMode) -> Unit,
+    loggedIn: Boolean,
+    onBack: () -> Unit,
+    onLogin: () -> Unit,
+    onLogout: () -> Unit,
 ) {
-    var downloadWifiOnly by remember { mutableStateOf(true) }
-    var preferMusicOnly by remember { mutableStateOf(true) }
-    var loudnessNormalization by remember { mutableStateOf(true) }
-    var fullScreenCover by remember { mutableStateOf(true) }
-    var animatedCover by remember { mutableStateOf(true) }
-    var syncedLyrics by remember { mutableStateOf(true) }
-    var filterShortAudio by remember { mutableStateOf(true) }
-    var selectedTheme by remember { mutableIntStateOf(0) }
+    val c = AppTheme.colors
+    val prefs = AppPrefs.prefs(LocalContext.current)
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {},
-                navigationIcon = {
-                    IconButton(
-                        onClick = onBackClick,
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.1f))
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali", tint = Color.White)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
-            )
-        },
-        containerColor = Color.Black
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState())
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(c.background)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp),
+    ) {
+        Spacer(Modifier.height(12.dp))
+        Box(
+            Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(c.surface)
+                .clickable(onClick = onBack),
+            contentAlignment = Alignment.Center,
         ) {
-            Text("Settings", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = Color(0xFF1C1C1E)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Search settings", color = Color.Gray, fontSize = 15.sp)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // ACCOUNT & INTEGRATIONS
-            SettingsGroupCard {
-                SettingsItemRow(
-                    icon = Icons.Default.Person,
-                    title = "Account & integrations",
-                    subtitle = "Login YouTube Music (@dennydamaraofficial)",
-                    onClick = onLoginClick
-                )
-                HorizontalDivider(color = Color(0xFF2C2C2E))
-                SettingsItemRow(
-                    icon = Icons.Default.Share,
-                    title = "Listen together",
-                    subtitle = "Share a code and play the same music, in time"
-                )
-            }
-
-            // AUDIO QUALITY
-            SectionTitle("AUDIO QUALITY")
-            SettingsGroupCard {
-                SettingsItemRow(
-                    icon = Icons.Default.Extension,
-                    title = "Sources",
-                    subtitle = "Where audio comes from and the order used"
-                )
-                HorizontalDivider(color = Color(0xFF2C2C2E))
-                SettingsItemRow(icon = Icons.Default.Wifi, title = "On Wi-Fi", valueText = "Lossless")
-                HorizontalDivider(color = Color(0xFF2C2C2E))
-                SettingsItemRow(icon = Icons.Default.SignalCellularAlt, title = "On mobile data", valueText = "Low")
-            }
-
-            // DOWNLOADS
-            SectionTitle("DOWNLOADS")
-            SettingsGroupCard {
-                SettingsItemRow(
-                    icon = Icons.Default.Download,
-                    title = "Download quality",
-                    subtitle = "~35 MB per track, whatever the connection",
-                    valueText = "Lossless"
-                )
-                HorizontalDivider(color = Color(0xFF2C2C2E))
-                SettingsToggleRow(
-                    title = "Download over Wi-Fi only",
-                    checked = downloadWifiOnly,
-                    onCheckedChange = { downloadWifiOnly = it }
-                )
-            }
-
-            // PLAYBACK
-            SectionTitle("PLAYBACK")
-            SettingsGroupCard {
-                SettingsToggleRow(
-                    icon = Icons.Default.PlayArrow,
-                    title = "Prefer music-only version",
-                    subtitle = "For music videos, show video details while loading audio",
-                    checked = preferMusicOnly,
-                    onCheckedChange = { preferMusicOnly = it }
-                )
-                HorizontalDivider(color = Color(0xFF2C2C2E))
-                SettingsToggleRow(
-                    icon = Icons.Default.VolumeUp,
-                    title = "Loudness normalization",
-                    subtitle = "Levels every track to the same loudness",
-                    checked = loudnessNormalization,
-                    onCheckedChange = { loudnessNormalization = it }
-                )
-            }
-
-            // APPEARANCE
-            SectionTitle("APPEARANCE")
-            SettingsGroupCard {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Palette, contentDescription = null, tint = Color.White)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Theme", color = Color.White, fontWeight = FontWeight.SemiBold)
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        SegmentedButton(
-                            selected = selectedTheme == 0,
-                            onClick = { selectedTheme = 0 },
-                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3)
-                        ) { Text("System") }
-                        SegmentedButton(
-                            selected = selectedTheme == 1,
-                            onClick = { selectedTheme = 1 },
-                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3)
-                        ) { Text("Light") }
-                        SegmentedButton(
-                            selected = selectedTheme == 2,
-                            onClick = { selectedTheme = 2 },
-                            shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3)
-                        ) { Text("Dark") }
-                    }
-                }
-                HorizontalDivider(color = Color(0xFF2C2C2E))
-                SettingsToggleRow(
-                    icon = Icons.Default.AspectRatio,
-                    title = "Full-screen cover art",
-                    subtitle = "Runs cover to edges of player",
-                    checked = fullScreenCover,
-                    onCheckedChange = { fullScreenCover = it }
-                )
-                HorizontalDivider(color = Color(0xFF2C2C2E))
-                SettingsToggleRow(
-                    icon = Icons.Default.MotionPhotosAuto,
-                    title = "Animated cover art",
-                    subtitle = "Plays looping video instead of still sleeve",
-                    checked = animatedCover,
-                    onCheckedChange = { animatedCover = it }
-                )
-                HorizontalDivider(color = Color(0xFF2C2C2E))
-                SettingsToggleRow(
-                    icon = Icons.Default.FormatAlignLeft,
-                    title = "Synced lyrics",
-                    subtitle = "Lights up words on player as sung",
-                    checked = syncedLyrics,
-                    onCheckedChange = { syncedLyrics = it }
-                )
-            }
-
-            // LOCAL MUSIC & STORAGE
-            SectionTitle("LOCAL MUSIC & STORAGE")
-            SettingsGroupCard {
-                SettingsItemRow(icon = Icons.Default.Folder, title = "Local music folder", subtitle = "All audio folders")
-                HorizontalDivider(color = Color(0xFF2C2C2E))
-                SettingsToggleRow(
-                    icon = Icons.Default.FilterList,
-                    title = "Filter non-music audio",
-                    subtitle = "Hides clips under 30s & recordings",
-                    checked = filterShortAudio,
-                    onCheckedChange = { filterShortAudio = it }
-                )
-                HorizontalDivider(color = Color(0xFF2C2C2E))
-                SettingsItemRow(icon = Icons.Default.CleaningServices, title = "Clear song cache", subtitle = "Frees space used by audio")
-            }
-
-            Spacer(modifier = Modifier.height(100.dp))
+            Icon(
+                Icons.Filled.ArrowBack,
+                contentDescription = "Kembali",
+                tint = c.text,
+                modifier = Modifier.size(24.dp),
+            )
         }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "Settings",
+            color = c.text,
+            fontSize = 40.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = (-0.5).sp,
+        )
+
+        SectionLabel("Akun")
+        SettingsCard {
+            SettingsRow(
+                icon = Icons.Filled.AccountCircle,
+                title = if (loggedIn) "Akun YouTube terhubung" else "Login ke YouTube Music",
+                subtitle = if (loggedIn) {
+                    "Ketuk untuk keluar dari akun"
+                } else {
+                    "Masuk untuk memakai playlist dan riwayatmu"
+                },
+                onClick = if (loggedIn) onLogout else onLogin,
+            )
+        }
+
+        SectionLabel("Kualitas audio")
+        SettingsCard {
+            SettingsRow(Icons.Filled.Wifi, "Di Wi-Fi", value = "Lossless")
+            SettingsRow(Icons.Filled.SignalCellularAlt, "Di data seluler", value = "Rendah")
+            SettingsRow(Icons.Filled.GraphicEq, "Kualitas output", value = "16-bit PCM")
+        }
+
+        SectionLabel("Unduhan")
+        SettingsCard {
+            SettingsRow(
+                icon = Icons.Filled.Download,
+                title = "Kualitas unduhan",
+                subtitle = "Sekitar 35 MB per lagu",
+                value = "Lossless",
+            )
+            SwitchRow(
+                icon = Icons.Filled.Wifi,
+                title = "Unduh hanya lewat Wi-Fi",
+                prefs = prefs,
+                key = "dl_wifi_only",
+                default = true,
+            )
+        }
+
+        SectionLabel("Pemutaran")
+        SettingsCard {
+            SwitchRow(
+                icon = Icons.Filled.PlayCircle,
+                title = "Utamakan versi musik",
+                subtitle = "Untuk video musik, pakai versi audionya",
+                prefs = prefs,
+                key = "music_only",
+                default = true,
+            )
+            SwitchRow(
+                icon = Icons.Filled.VolumeUp,
+                title = "Normalisasi volume",
+                subtitle = "Samakan kenyaringan setiap lagu",
+                prefs = prefs,
+                key = "loudness",
+                default = true,
+            )
+            SwitchRow(
+                icon = Icons.Filled.Tune,
+                title = "Berhenti saat ditutup dari recent apps",
+                prefs = prefs,
+                key = "stop_on_close",
+                default = true,
+            )
+        }
+
+        SectionLabel("Tampilan")
+        SettingsCard {
+            Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Filled.Brightness6,
+                        contentDescription = null,
+                        tint = c.text,
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Text("Tema", color = c.text, fontSize = 17.sp)
+                }
+                Spacer(Modifier.height(12.dp))
+                ThemeSegment(current = themeMode, onSelect = onThemeModeChange)
+            }
+            SwitchRow(
+                icon = Icons.Filled.Tune,
+                title = "Cover layar penuh",
+                subtitle = "Cover memenuhi pemutar, bukan kotak",
+                prefs = prefs,
+                key = "full_cover",
+                default = true,
+            )
+        }
+
+        SectionLabel("Bahasa")
+        SettingsCard {
+            SettingsRow(Icons.Filled.Language, "Bahasa aplikasi", value = "Indonesia")
+        }
+
+        SectionLabel("Tentang")
+        SettingsCard {
+            SettingsRow(Icons.Filled.Tune, "Versi aplikasi", value = "1.0")
+        }
+
+        Text(
+            "ByteBeat · Pemutaran berasal dari YouTube Music",
+            color = c.textSecondary,
+            fontSize = 13.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 28.dp, bottom = 32.dp),
+        )
     }
 }
 
 @Composable
-fun SectionTitle(title: String) {
+private fun SectionLabel(text: String) {
     Text(
-        text = title,
-        color = Color.Gray,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(start = 4.dp, top = 20.dp, bottom = 8.dp)
+        text.uppercase(),
+        color = AppTheme.colors.textSecondary,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Medium,
+        modifier = Modifier.padding(start = 4.dp, top = 24.dp, bottom = 8.dp),
     )
 }
 
 @Composable
-fun SettingsGroupCard(content: @Composable ColumnScope.() -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E))
+private fun SettingsCard(content: @Composable () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(AppTheme.colors.surface),
     ) {
-        Column { content() }
+        content()
     }
 }
 
 @Composable
-fun SettingsItemRow(
-    icon: ImageVector? = null,
+private fun SettingsRow(
+    icon: ImageVector,
     title: String,
     subtitle: String? = null,
-    valueText: String? = null,
-    onClick: () -> Unit = {}
+    value: String? = null,
+    onClick: (() -> Unit)? = null,
 ) {
+    val c = AppTheme.colors
     Row(
-        modifier = Modifier
+        Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .clickable(enabled = onClick != null) { onClick?.invoke() }
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (icon != null) {
-            Icon(icon, contentDescription = null, tint = Color.White)
-            Spacer(modifier = Modifier.width(16.dp))
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+        Icon(icon, contentDescription = null, tint = c.text, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = c.text, fontSize = 17.sp)
             if (subtitle != null) {
-                Text(subtitle, color = Color.Gray, fontSize = 13.sp)
+                Text(subtitle, color = c.textSecondary, fontSize = 14.sp)
             }
         }
-        if (valueText != null) {
-            Text(valueText, color = Color.Gray, fontSize = 14.sp)
-            Spacer(modifier = Modifier.width(4.dp))
+        if (value != null) {
+            Spacer(Modifier.width(8.dp))
+            Text(value, color = c.textSecondary, fontSize = 16.sp)
         }
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = Color.Gray)
+        if (onClick != null) {
+            Icon(
+                Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = c.textSecondary,
+                modifier = Modifier.size(20.dp),
+            )
+        }
     }
 }
 
 @Composable
-fun SettingsToggleRow(
-    icon: ImageVector? = null,
+private fun SwitchRow(
+    icon: ImageVector,
     title: String,
     subtitle: String? = null,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    prefs: SharedPreferences,
+    key: String,
+    default: Boolean,
 ) {
+    val c = AppTheme.colors
+    var checked by remember { mutableStateOf(prefs.getBoolean(key, default)) }
     Row(
-        modifier = Modifier
+        Modifier
             .fillMaxWidth()
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .clickable {
+                checked = !checked
+                prefs.edit().putBoolean(key, checked).apply()
+            }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (icon != null) {
-            Icon(icon, contentDescription = null, tint = Color.White)
-            Spacer(modifier = Modifier.width(16.dp))
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+        Icon(icon, contentDescription = null, tint = c.text, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = c.text, fontSize = 17.sp)
             if (subtitle != null) {
-                Text(subtitle, color = Color.Gray, fontSize = 13.sp)
+                Text(subtitle, color = c.textSecondary, fontSize = 14.sp)
             }
         }
+        Spacer(Modifier.width(12.dp))
         Switch(
             checked = checked,
-            onCheckedChange = onCheckedChange,
+            onCheckedChange = null,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = Color(0xFFFF2D55)
-            )
+                checkedTrackColor = c.text,
+                checkedThumbColor = c.background,
+                checkedBorderColor = Color.Transparent,
+                uncheckedTrackColor = c.textSecondary.copy(alpha = 0.3f),
+                uncheckedThumbColor = c.background,
+                uncheckedBorderColor = Color.Transparent,
+            ),
         )
     }
+}
+
+@Composable
+private fun ThemeSegment(current: ThemeMode, onSelect: (ThemeMode) -> Unit) {
+    val c = AppTheme.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(c.background)
+            .padding(4.dp),
+    ) {
+        ThemeMode.entries.forEach { mode ->
+            val selected = mode == current
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (selected) c.segmentSelected else Color.Transparent)
+                    .clickable { onSelect(mode) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    mode.shortLabel(),
+                    color = if (selected) c.segmentSelectedText else c.textSecondary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+    }
+}
+
+private fun ThemeMode.shortLabel(): String = when (this) {
+    ThemeMode.System -> "Sistem"
+    ThemeMode.Light -> "Terang"
+    ThemeMode.Dark -> "Gelap"
 }
