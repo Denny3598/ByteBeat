@@ -35,8 +35,8 @@ import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,7 +56,7 @@ import com.example.applemusicui.ui.theme.AppTheme
 import com.example.applemusicui.ui.theme.AppleRed
 import com.example.applemusicui.ui.theme.ThemeMode
 
-/** Dipanggil saat avatar ditekan (membuka dialog pilihan tema). */
+/** Dipanggil saat avatar ditekan (sekarang membuka halaman Settings). */
 val LocalOnAvatarClick = staticCompositionLocalOf<() -> Unit> { {} }
 
 /** Cover art: gradien sebagai cadangan, lalu gambar asli di atasnya kalau ada. */
@@ -355,7 +355,7 @@ fun PillTabBar(selected: AppTab, onSelect: (AppTab) -> Unit, modifier: Modifier 
     }
 }
 
-/** Dialog pilihan tema: Ikuti sistem / Terang / Gelap. */
+/** Dialog pilihan tema (tidak lagi dipakai; tema sekarang ada di Settings). */
 @Composable
 fun ThemeDialog(current: ThemeMode, onSelect: (ThemeMode) -> Unit, onDismiss: () -> Unit) {
     val c = AppTheme.colors
