@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.sp
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import com.example.applemusicui.data.YouTubeMusicRepository
+import com.example.applemusicui.ui.BottomNavigationBar
+import com.example.applemusicui.ui.HomeScreen
 import com.example.applemusicui.ui.NowPlayingScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -35,131 +37,103 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Inisialisasi ExoPlayer untuk pemutaran audio
         player = ExoPlayer.Builder(this).build()
 
         setContent {
             MaterialTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    color = Color.Black
                 ) {
                     val scope = rememberCoroutineScope()
 
+                    var selectedTab by remember { mutableIntStateOf(0) }
                     var isNowPlayingOpen by remember { mutableStateOf(false) }
                     var isPlaying by remember { mutableStateOf(false) }
 
-                    var songTitle by remember { mutableStateOf("Mencari lagu...") }
-                    var songArtist by remember { mutableStateOf("YouTube Music") }
+                    var songTitle by remember { mutableStateOf("It's You") }
+                    var songArtist by remember { mutableStateOf("Sezairi") }
                     var coverUrl by remember { mutableStateOf("") }
 
-                    // Integrasi YouTube Music + Audio Playback Sekaligus
                     LaunchedEffect(Unit) {
                         scope.launch(Dispatchers.IO) {
                             try {
-                                val songs = YouTubeMusicRepository.searchSongs("TWICE Alcohol Free")
+                                val songs = YouTubeMusicRepository.searchSongs("It's You Sezairi")
                                 val song = songs.firstOrNull()
 
                                 if (song != null) {
-                                    // Mengambil URL stream audio langsung
                                     val audioStreamUrl = try {
                                         YouTubeMusicRepository.audioUrl(song.url)
-                                    } catch (e: Exception) {
-                                        ""
-                                    }
+                                    } catch (e: Exception) { "" }
 
                                     withContext(Dispatchers.Main) {
                                         songTitle = song.title
                                         songArtist = song.artist
-                                        coverUrl = song.thumbnail ?: "" // Penanganan Null Safety (String? -> String)
+                                        coverUrl = song.thumbnail ?: ""
 
                                         if (audioStreamUrl.isNotEmpty()) {
                                             val mediaItem = MediaItem.fromUri(audioStreamUrl)
                                             player?.setMediaItem(mediaItem)
                                             player?.prepare()
-                                            player?.play()
-                                            isPlaying = true
                                         }
                                     }
-                                } else {
-                                    withContext(Dispatchers.Main) {
-                                        songTitle = "Alcohol-Free"
-                                        songArtist = "TWICE"
-                                    }
                                 }
-                            } catch (e: Exception) {
-                                withContext(Dispatchers.Main) {
-                                    songTitle = "Alcohol-Free"
-                                    songArtist = "TWICE"
-                                }
-                            }
+                            } catch (e: Exception) { }
                         }
                     }
 
                     Box(modifier = Modifier.fillMaxSize()) {
+                        
+                        // KONTEN HALAMAN UTAMA
+                        HomeScreen()
 
-                        // KONTEN UTAMA
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = "ByteBeat Player",
-                                style = MaterialTheme.typography.headlineMedium
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Button(onClick = { isNowPlayingOpen = true }) {
-                                Text("Buka Full Screen Player")
-                            }
-                        }
-
-                        // MINI PLAYER (BOTTOM BAR)
+                        // BOTTOM CONTROLS (MINI PLAYER + BOTTOM BAR)
                         if (!isNowPlayingOpen) {
-                            Box(
+                            Column(
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
-                                    .padding(horizontal = 12.dp, vertical = 16.dp)
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0xFF222222))
-                                    .clickable { isNowPlayingOpen = true }
-                                    .padding(horizontal = 16.dp, vertical = 12.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                // MINI PLAYER BAR
+                                Box(
+                                    modifier = Modifier
+                                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(Color(0xFF1C1C1E))
+                                        .clickable { isNowPlayingOpen = true }
+                                        .padding(horizontal = 16.dp, vertical = 10.dp)
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = songTitle,
-                                            color = Color.White,
-                                            fontSize = 14.sp
-                                        )
-                                        Text(
-                                            text = songArtist,
-                                            color = Color.Gray,
-                                            fontSize = 12.sp
-                                        )
-                                    }
-
-                                    IconButton(
-                                        onClick = {
-                                            isPlaying = !isPlaying
-                                            if (isPlaying) player?.play() else player?.pause()
-                                        }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Icon(
-                                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                            contentDescription = "Play/Pause",
-                                            tint = Color.White
-                                        )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(text = songTitle, color = Color.White, fontSize = 14.sp)
+                                            Text(text = songArtist, color = Color.Gray, fontSize = 12.sp)
+                                        }
+
+                                        IconButton(
+                                            onClick = {
+                                                isPlaying = !isPlaying
+                                                if (isPlaying) player?.play() else player?.pause()
+                                            }
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                                contentDescription = "Play/Pause",
+                                                tint = Color.White
+                                            )
+                                        }
                                     }
                                 }
+
+                                // BOTTOM NAV BAR
+                                BottomNavigationBar(
+                                    selectedTab = selectedTab,
+                                    onTabSelected = { selectedTab = it }
+                                )
                             }
                         }
 
@@ -172,7 +146,7 @@ class MainActivity : ComponentActivity() {
                             NowPlayingScreen(
                                 title = songTitle,
                                 artist = songArtist,
-                                albumType = "YouTube Music",
+                                albumType = "Single",
                                 imageUrl = coverUrl,
                                 isPlaying = isPlaying,
                                 onPlayPauseToggle = {
