@@ -21,7 +21,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.example.applemusicui.data.AppPrefs
 import com.example.applemusicui.data.DummyData
@@ -60,6 +63,15 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
     val highlight = current ?: DummyData.songs.first()
     val play: (Song, List<Song>) -> Unit = { song, list -> controller.play(song, list) }
 
+    // Posisi mini player, dipakai agar cover membesar dari tempat yang sama saat pemutar dibuka.
+    var miniBarBounds by remember { mutableStateOf<Rect?>(null) }
+    val density = LocalDensity.current
+    val coverStart: Rect? = miniBarBounds?.let { bar ->
+        val pad = with(density) { 10.dp.toPx() }
+        val side = with(density) { 48.dp.toPx() }
+        Rect(bar.left + pad, bar.top + pad, bar.left + pad + side, bar.top + pad + side)
+    }
+
     // Tombol kembali menutup layar paling atas dulu. Yang paling bawah didaftarkan lebih dulu.
     BackHandler(enabled = showNowPlaying) { showNowPlaying = false }
     BackHandler(enabled = showSettings) { showSettings = false }
@@ -69,7 +81,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
         Box(
             Modifier
                 .fillMaxSize()
-                .background(c.background)
+                .background(c.background),
         ) {
             when (tab) {
                 AppTab.Home -> ListenNowScreen(highlight, play)
@@ -83,14 +95,15 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
                 Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
                 if (current != null) {
                     // Ketuk area mini player (bukan tombolnya) untuk membuka pemutar penuh.
                     Box(
                         Modifier
                             .fillMaxWidth()
-                            .clickable { showNowPlaying = true }
+                            .onGloballyPositioned { miniBarBounds = it.boundsInRoot() }
+                            .clickable { showNowPlaying = true },
                     ) {
                         MiniPlayer(
                             song = current,
@@ -108,6 +121,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
                 NowPlayingScreen(
                     song = current,
                     controller = controller,
+                    startRect = coverStart,
                     onClose = { showNowPlaying = false },
                 )
             }
