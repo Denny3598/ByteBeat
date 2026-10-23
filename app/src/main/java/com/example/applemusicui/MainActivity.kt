@@ -2,83 +2,50 @@ package com.example.applemusicui
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import com.example.applemusicui.ui.components.*
-import com.example.applemusicui.ui.screens.*
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.example.applemusicui.ui.AppRoot
+import com.example.applemusicui.ui.theme.AppleMusicTheme
+import com.example.applemusicui.ui.theme.ThemeMode
+import com.example.applemusicui.ui.theme.ThemePrefs
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
-                ByteBeatMainApp()
+            var mode by remember { mutableStateOf(ThemePrefs.load(this@MainActivity)) }
+            val dark = when (mode) {
+                ThemeMode.System -> isSystemInDarkTheme()
+                ThemeMode.Light -> false
+                ThemeMode.Dark -> true
             }
-        }
-    }
-}
 
-enum class BottomTab(val title: String) {
-    HOME("Home"),
-    EXPLORE("Explore"),
-    LIBRARY("Library"),
-    SEARCH("Search")
-}
-
-@Composable
-fun ByteBeatMainApp() {
-    var selectedTab by remember { mutableStateOf(BottomTab.HOME) }
-    var showSettings by remember { mutableStateOf(false) }
-    var showLoginDialog by remember { mutableStateOf(false) }
-
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = Color.Black
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (showSettings) {
-                SettingsScreen(
-                    onBackClick = { showSettings = false },
-                    onLoginClick = { showLoginDialog = true }
-                )
-            } else {
-                Scaffold(
-                    topBar = {
-                        MainTopAppBar(onProfileClick = { showSettings = true })
-                    },
-                    bottomBar = {
-                        GlassmorphicBottomNavigation(
-                            selectedTab = selectedTab,
-                            onTabSelected = { selectedTab = it }
-                        )
-                    },
-                    containerColor = Color.Black
-                ) { innerPadding ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding)
-                    ) {
-                        when (selectedTab) {
-                            BottomTab.HOME -> HomeScreen()
-                            BottomTab.EXPLORE -> ExploreScreen()
-                            BottomTab.LIBRARY -> LibraryScreen()
-                            BottomTab.SEARCH -> SearchScreen()
-                        }
-                    }
+            // Warna ikon status bar & navigation bar mengikuti tema.
+            DisposableEffect(dark) {
+                val transparent = android.graphics.Color.TRANSPARENT
+                val style = if (dark) {
+                    SystemBarStyle.dark(transparent)
+                } else {
+                    SystemBarStyle.light(transparent, transparent)
                 }
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                onDispose { }
             }
 
-            if (showLoginDialog) {
-                YouTubeLoginDialog(
-                    onDismiss = { showLoginDialog = false },
-                    onLoginSuccess = { cookie ->
-                        showLoginDialog = false
-                    }
+            AppleMusicTheme(darkTheme = dark) {
+                AppRoot(
+                    themeMode = mode,
+                    onThemeModeChange = {
+                        mode = it
+                        ThemePrefs.save(this@MainActivity, it)
+                    },
                 )
             }
         }
