@@ -16,7 +16,25 @@ android {
         versionName = "1.0"
     }
 
+    // Kunci tetap dari secret GitHub. Hanya aktif kalau KEYSTORE_PATH diisi oleh workflow.
+    signingConfigs {
+        create("bytebeat") {
+            val ks = System.getenv("KEYSTORE_PATH")
+            if (ks != null) {
+                storeFile = file(ks)
+                storePassword = System.getenv("KEY_STORE_PASSWORD")
+                keyAlias = System.getenv("ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            if (System.getenv("KEYSTORE_PATH") != null) {
+                signingConfig = signingConfigs.getByName("bytebeat")
+            }
+        }
         release {
             isMinifyEnabled = false
         }
@@ -27,12 +45,15 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
         isCoreLibraryDesugaringEnabled = true
     }
+
     kotlinOptions {
         jvmTarget = "17"
     }
+
     buildFeatures {
         compose = true
     }
+
     packaging {
         resources {
             excludes += setOf(
