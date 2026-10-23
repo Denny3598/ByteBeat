@@ -24,6 +24,7 @@ data class LibraryItem(
 /** Pustaka akun YouTube Music yang sedang login (memakai cookie dari WebView login). */
 object LibraryRepository {
     private const val API = "https://music.youtube.com/youtubei/v1/browse?prettyPrint=false"
+    private const val YT_ORIGIN = "https://music.youtube.com"
     private const val CLIENT_VERSION = "1.20241009.01.00"
     private const val USER_AGENT =
         "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36"
@@ -77,14 +78,14 @@ object LibraryRepository {
     }
 
     private fun browse(browseId: String): JSONObject {
-        val cookie = CookieManager.getInstance().getCookie(AppPrefs.YT_URL)
+        val cookie = CookieManager.getInstance().getCookie(YT_ORIGIN)
             ?: error("Belum login")
         val sapisid = sapisid(cookie) ?: error("Cookie login tidak lengkap")
 
         // SAPISIDHASH: SHA-1 dari "timestamp sapisid origin"
         val ts = System.currentTimeMillis() / 1000
         val hash = MessageDigest.getInstance("SHA-1")
-            .digest("$ts $sapisid ${AppPrefs.YT_URL}".toByteArray())
+            .digest("$ts $sapisid $YT_ORIGIN".toByteArray())
             .joinToString("") { "%02x".format(it) }
 
         val client = JSONObject()
@@ -99,8 +100,8 @@ object LibraryRepository {
         val req = Request.Builder()
             .url(API)
             .header("User-Agent", USER_AGENT)
-            .header("Origin", AppPrefs.YT_URL)
-            .header("Referer", "${AppPrefs.YT_URL}/")
+            .header("Origin", YT_ORIGIN)
+            .header("Referer", "$YT_ORIGIN/")
             .header("Authorization", "SAPISIDHASH ${ts}_$hash")
             .header("Cookie", cookie)
             .header("X-Goog-AuthUser", "0")
