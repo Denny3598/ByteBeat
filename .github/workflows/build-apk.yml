@@ -31,12 +31,11 @@ jobs:
           ALIAS: ${{ secrets.ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          if [ -f "./gradlew" ]; then
-            ./gradlew assembleRelease
-          else
-            cd ByteBeat
-            ./gradlew assembleRelease
-          fi
+          # Cari file gradlew lalu jalankan assembleRelease di folder tempat gradlew berada
+          GRADLEW_PATH=$(find . -name "gradlew" | head -n 1)
+          GRADLE_DIR=$(dirname "$GRADLEW_PATH")
+          cd "$GRADLE_DIR"
+          ./gradlew assembleRelease
 
       - name: Upload Signed APK
         uses: actions/upload-artifact@v4
