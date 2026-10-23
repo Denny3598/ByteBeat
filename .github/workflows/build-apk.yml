@@ -20,21 +20,51 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle System
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Build Signed Release APK
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew || true
+
+      - name: Build Release APK
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
           KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           ALIAS: ${{ secrets.ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          gradle assembleRelease
+          if [ -f "./gradlew" ]; then
+            ./gradlew assembleRelease
+          else
+            gradle assembleRelease
+          fi
+
+      - name: Sign APK with apksigner
+        env:
+          SIGNING_KEY_BASE64: ${{ secrets.SIGNING_KEY }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          echo "$SIGNING_KEY_BASE64" | base64 -d > release.keystore
+          UNSIGNED_APK=$(find . -name "*-release-unsigned.apk" | head -n 1)
+          
+          if [ -n "$UNSIGNED_APK" ]; then
+            $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
+              --ks release.keystore \
+              --ks-pass pass:"$KEYSTORE_PASSWORD" \
+              --ks-key-alias "$KEY_ALIAS" \
+              --key-pass pass:"$KEY_PASSWORD" \
+              --out ByteBeat-Release.apk \
+              "$UNSIGNED_APK"
+          else
+            echo "File APK unsigned tidak ditemukan."
+            exit 1
+          fi
 
       - name: Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
           name: ByteBeat-Release
-          path: "**/build/outputs/apk/release/*.apk"
+          path: ByteBeat-Release.apk
           
