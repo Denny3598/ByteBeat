@@ -27,18 +27,27 @@ jobs:
       - name: Build Release APK
         run: ./gradlew assembleRelease
 
-      - name: Sign APK
-        uses: rbf/build-signer-action@v1.3
-        with:
-          file: 'app/build/outputs/apk/release/app-release-unsigned.apk'
-          base64-keystore: ${{ secrets.SIGNING_KEY }}
-          keystore-password: ${{ secrets.KEY_STORE_PASSWORD }}
-          key-alias: ${{ secrets.ALIAS }}
-          key-password: ${{ secrets.KEY_PASSWORD }}
+      - name: Sign APK with Native Android Tools
+        env:
+          SIGNING_KEY_BASE64: ${{ secrets.SIGNING_KEY }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          echo "$SIGNING_KEY_BASE64" | base64 -d > release.keystore
+          
+          # Pakai apksigner resmi dari Build Tools Android
+          $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
+            --ks release.keystore \
+            --ks-pass pass:"$KEYSTORE_PASSWORD" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --key-pass pass:"$KEY_PASSWORD" \
+            --out app/build/outputs/apk/release/ByteBeat-Signed.apk \
+            app/build/outputs/apk/release/app-release-unsigned.apk
 
       - name: Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
           name: ByteBeat-Release
-          path: app/build/outputs/apk/release/*.apk
+          path: app/build/outputs/apk/release/ByteBeat-Signed.apk
           
