@@ -48,12 +48,8 @@ fun ExploreScreen() {
         moods = runCatching { ExploreRepository.moods() }.getOrDefault(emptyList())
     }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp),
-    ) {
+    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+        // Judul memakai margin yang sama dengan Listen Now (20dp dari komponen ScreenHeader).
         ScreenHeader("Jelajahi")
         Spacer(Modifier.height(12.dp))
 
@@ -85,7 +81,7 @@ fun ExploreScreen() {
             else -> LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(bottom = 200.dp),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 200.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
