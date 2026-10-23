@@ -10,9 +10,9 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven { url = uri("https://jitpack.io") }
+        maven { url = java.net.URI("https://jitpack.io") }
     }
 }
 
-rootProject.name = "AppleMusicUI"
+rootProject.name = "ByteBeat"
 include(":app")
