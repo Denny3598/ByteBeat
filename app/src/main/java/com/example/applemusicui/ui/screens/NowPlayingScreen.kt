@@ -1,5 +1,7 @@
 package com.example.applemusicui.ui.screens
 
+import android.content.Context
+import android.media.AudioManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -9,25 +11,29 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.IosShare
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.VolumeDown
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
@@ -44,6 +50,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -53,10 +61,16 @@ import com.example.applemusicui.ui.components.Artwork
 import com.example.applemusicui.ui.playback.PlaybackController
 import com.example.applemusicui.ui.theme.AppTheme
 import com.example.applemusicui.ui.theme.AppleRed
+import kotlin.math.roundToInt
 
 @Composable
 fun NowPlayingScreen(song: Song, controller: PlaybackController, onClose: () -> Unit) {
     val c = AppTheme.colors
+    val context = LocalContext.current
+    val audio = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+    val maxVolume = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+    var volume by remember { mutableStateOf(audio.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat()) }
+
     var scrub by remember { mutableStateOf<Float?>(null) }
     var shuffle by rememberSaveable { mutableStateOf(false) }
     var repeat by rememberSaveable { mutableStateOf(false) }
@@ -80,42 +94,40 @@ fun NowPlayingScreen(song: Song, controller: PlaybackController, onClose: () -> 
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = 20.dp),
         ) {
-            // Tombol turun
-            Row(
+            // Gagang kecil di atas, ketuk untuk menutup (seperti Apple Music)
+            Box(
                 Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .clickable(onClick = onClose)
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    Icons.Filled.KeyboardArrowDown,
-                    contentDescription = "Tutup",
-                    tint = c.text,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .clickable(onClick = onClose)
-                        .padding(6.dp),
+                Box(
+                    Modifier
+                        .width(40.dp)
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(c.divider),
                 )
             }
 
-            Spacer(Modifier.size(24.dp))
+            Spacer(Modifier.height(8.dp))
 
-            // Cover
+            // Cover penuh selebar layar
             Artwork(
                 colors = song.art,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f),
-                corner = 14.dp,
+                corner = 16.dp,
                 imageUrl = song.thumbnail,
             )
 
-            Spacer(Modifier.size(28.dp))
+            Spacer(Modifier.height(24.dp))
 
-            // Judul + tombol opsi
+            // Judul + tombol suka dan opsi
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
@@ -135,12 +147,14 @@ fun NowPlayingScreen(song: Song, controller: PlaybackController, onClose: () -> 
                     )
                 }
                 Spacer(Modifier.width(12.dp))
+                CircleIcon(Icons.Filled.FavoriteBorder, "Suka")
+                Spacer(Modifier.width(10.dp))
                 CircleIcon(Icons.Filled.MoreHoriz, "Opsi")
             }
 
-            Spacer(Modifier.size(22.dp))
+            Spacer(Modifier.height(20.dp))
 
-            // Progres
+            // Progres lagu
             Slider(
                 value = shown,
                 onValueChange = { scrub = it },
@@ -156,7 +170,7 @@ fun NowPlayingScreen(song: Song, controller: PlaybackController, onClose: () -> 
                 ),
             )
 
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(formatTime(shown.toLong()), color = c.textSecondary, fontSize = 13.sp)
                 Text(
                     "-" + formatTime(duration.toLong() - shown.toLong()),
@@ -165,22 +179,22 @@ fun NowPlayingScreen(song: Song, controller: PlaybackController, onClose: () -> 
                 )
             }
 
-            if (controller.errorText != null) {
+            controller.errorText?.let {
                 Text(
-                    controller.errorText.orEmpty(),
+                    it,
                     color = AppleRed,
                     fontSize = 14.sp,
                     modifier = Modifier.padding(top = 10.dp),
                 )
             }
 
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(16.dp))
 
             // Kontrol pemutaran
             Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
                 Icon(
                     Icons.Filled.Shuffle,
@@ -247,26 +261,61 @@ fun NowPlayingScreen(song: Song, controller: PlaybackController, onClose: () -> 
                 )
             }
 
-            Spacer(Modifier.size(28.dp))
+            Spacer(Modifier.height(20.dp))
+
+            // Volume (mengatur volume musik HP)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Filled.VolumeDown,
+                    contentDescription = "Volume kecil",
+                    tint = c.textSecondary,
+                    modifier = Modifier.size(22.dp),
+                )
+                Slider(
+                    value = volume,
+                    onValueChange = {
+                        volume = it
+                        audio.setStreamVolume(AudioManager.STREAM_MUSIC, it.roundToInt(), 0)
+                    },
+                    valueRange = 0f..maxVolume.toFloat(),
+                    steps = maxVolume - 1,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 12.dp),
+                    colors = SliderDefaults.colors(
+                        thumbColor = c.text,
+                        activeTrackColor = c.text,
+                        inactiveTrackColor = c.divider,
+                    ),
+                )
+                Icon(
+                    Icons.Filled.VolumeUp,
+                    contentDescription = "Volume besar",
+                    tint = c.textSecondary,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+
+            Spacer(Modifier.weight(1f))
 
             // Aksi bawah
             Row(
                 Modifier.fillMaxWidth(),
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
                 BottomAction(Icons.Filled.IosShare, "Bagikan")
                 BottomAction(Icons.Filled.FormatQuote, "Lirik")
-                BottomAction(Icons.Filled.FavoriteBorder, "Suka")
+                BottomAction(Icons.Filled.FavoriteBorder, "Favorit")
                 BottomAction(Icons.Filled.QueueMusic, "Antrean")
             }
 
-            Spacer(Modifier.size(24.dp))
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
 
 @Composable
-private fun CircleIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String) {
+private fun CircleIcon(icon: ImageVector, description: String) {
     val c = AppTheme.colors
     Box(
         Modifier
@@ -280,11 +329,11 @@ private fun CircleIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, de
 }
 
 @Composable
-private fun BottomAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String) {
+private fun BottomAction(icon: ImageVector, label: String) {
     val c = AppTheme.colors
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(icon, contentDescription = label, tint = c.text, modifier = Modifier.size(28.dp))
-        Spacer(Modifier.size(4.dp))
+        Spacer(Modifier.height(4.dp))
         Text(label, color = c.textSecondary, fontSize = 12.sp)
     }
 }
