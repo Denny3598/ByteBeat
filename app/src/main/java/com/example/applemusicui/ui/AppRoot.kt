@@ -74,7 +74,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
             when (tab) {
                 AppTab.Home -> ListenNowScreen(highlight, play)
                 AppTab.Explore -> ExploreScreen()
-                AppTab.Library -> LibraryScreen()
+                AppTab.Library -> LibraryScreen(onPlay = play)
                 AppTab.Search -> SearchScreen(highlight, play)
             }
 
