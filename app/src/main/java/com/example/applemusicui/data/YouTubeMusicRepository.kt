@@ -23,14 +23,14 @@ object YouTubeMusicRepository {
     }
 
     /** Cari lagu di YouTube Music. */
-    suspend fun searchSongs(query: String): List<Song> = withContext(Dispatchers.IO) {
+    suspend fun searchSongs(query: String, songsOnly: Boolean = true): List<Song> = withContext(Dispatchers.IO) {
         val q = query.trim()
         if (q.isEmpty()) return@withContext emptyList()
 
         ensureInit()
         val extractor = ServiceList.YouTube.getSearchExtractor(
             q,
-            listOf(YoutubeSearchQueryHandlerFactory.MUSIC_SONGS),
+            if (songsOnly) listOf(YoutubeSearchQueryHandlerFactory.MUSIC_SONGS) else emptyList(),
             "",
         )
         extractor.fetchPage()
