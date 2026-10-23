@@ -9,6 +9,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,12 +28,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.IosShare
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -42,8 +43,6 @@ import androidx.compose.material.icons.filled.VolumeDown
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,10 +50,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
@@ -62,8 +63,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -73,10 +76,14 @@ import androidx.compose.ui.util.lerp
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.components.Artwork
 import com.example.applemusicui.ui.playback.PlaybackController
-import com.example.applemusicui.ui.theme.AppTheme
 import com.example.applemusicui.ui.theme.AppleRed
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
+
+// Layar ini selalu di atas latar gelap (cover blur), jadi warnanya tetap putih.
+private val Fg = Color.White
+private val FgDim = Color.White.copy(alpha = 0.7f)
+private val TrackOff = Color.White.copy(alpha = 0.3f)
 
 @Composable
 fun NowPlayingScreen(
@@ -85,7 +92,6 @@ fun NowPlayingScreen(
     startRect: Rect? = null,
     onClose: () -> Unit,
 ) {
-    val c = AppTheme.colors
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val audio = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
@@ -122,7 +128,7 @@ fun NowPlayingScreen(
         label = "coverScale",
     )
 
-    // Cover berpindah dan membesar dari posisi cover di mini player.
+    // Cover selebar layar, berpindah dan membesar dari posisi cover di mini player.
     val coverModifier = Modifier
         .fillMaxWidth()
         .aspectRatio(1f)
@@ -156,21 +162,43 @@ fun NowPlayingScreen(
     Box(
         Modifier
             .fillMaxSize()
-            .background(c.background.copy(alpha = p))
-            .background(
-                Brush.verticalGradient(
-                    listOf(song.art.first().copy(alpha = 0.75f * p), c.background.copy(alpha = p)),
-                ),
-            ),
+            .background(Color.Black.copy(alpha = p)),
     ) {
+        // Latar: cover yang di-blur. Di Android 12 ke bawah blur tidak aktif,
+        // jadi lapisan gelap di bawahnya tetap menjaga keterbacaan.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = p }
+                .blur(60.dp),
+        ) {
+            Artwork(
+                colors = song.art,
+                modifier = Modifier.fillMaxSize(),
+                corner = 0.dp,
+                imageUrl = song.thumbnail,
+            )
+        }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Black.copy(alpha = 0.35f * p),
+                            Color.Black.copy(alpha = 0.85f * p),
+                        ),
+                    ),
+                ),
+        )
+
         Column(
             Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 20.dp),
+                .navigationBarsPadding(),
         ) {
-            // Gagang kecil di atas, ketuk untuk menutup (seperti Apple Music)
+            // Gagang kecil di atas, ketuk untuk menutup
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -183,18 +211,18 @@ fun NowPlayingScreen(
                         .width(40.dp)
                         .height(5.dp)
                         .clip(RoundedCornerShape(3.dp))
-                        .background(c.divider),
+                        .background(Color.White.copy(alpha = 0.5f)),
                 )
             }
 
             Spacer(Modifier.height(8.dp))
 
-            // Cover penuh selebar layar
+            // Cover selebar layar
             Box(coverModifier) {
                 Artwork(
                     colors = song.art,
                     modifier = Modifier.fillMaxSize(),
-                    corner = 16.dp,
+                    corner = 0.dp,
                     imageUrl = song.thumbnail,
                 )
             }
@@ -203,25 +231,27 @@ fun NowPlayingScreen(
 
             // Judul, progres, dan waktu (muncul lebih dulu)
             Column(
-                Modifier.graphicsLayer {
-                    alpha = titleAlpha
-                    translationY = (1f - titleAlpha) * 30f
-                },
+                Modifier
+                    .padding(horizontal = 24.dp)
+                    .graphicsLayer {
+                        alpha = titleAlpha
+                        translationY = (1f - titleAlpha) * 30f
+                    },
             ) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(
                             song.title,
-                            color = c.text,
-                            fontSize = 24.sp,
+                            color = Fg,
+                            fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
                             song.artist,
-                            color = c.textSecondary,
-                            fontSize = 18.sp,
+                            color = FgDim,
+                            fontSize = 17.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -234,27 +264,24 @@ fun NowPlayingScreen(
 
                 Spacer(Modifier.height(20.dp))
 
-                Slider(
+                SlimSlider(
                     value = shown,
+                    range = 0f..duration,
                     onValueChange = { scrub = it },
                     onValueChangeFinished = {
                         scrub?.let { controller.seekTo(it.toLong()) }
                         scrub = null
                     },
-                    valueRange = 0f..duration,
-                    colors = SliderDefaults.colors(
-                        thumbColor = c.text,
-                        activeTrackColor = c.text,
-                        inactiveTrackColor = c.divider,
-                    ),
                 )
 
+                Spacer(Modifier.height(6.dp))
+
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(formatTime(shown.toLong()), color = c.textSecondary, fontSize = 13.sp)
+                    Text(formatTime(shown.toLong()), color = FgDim, fontSize = 12.sp)
                     Text(
                         "-" + formatTime(duration.toLong() - shown.toLong()),
-                        color = c.textSecondary,
-                        fontSize = 13.sp,
+                        color = FgDim,
+                        fontSize = 12.sp,
                     )
                 }
 
@@ -272,13 +299,13 @@ fun NowPlayingScreen(
 
             // Kontrol, volume, dan aksi bawah (muncul sedikit setelah judul)
             Column(
-                Modifier.graphicsLayer {
-                    alpha = controlsAlpha
-                    translationY = (1f - controlsAlpha) * 30f
-                },
+                Modifier
+                    .padding(horizontal = 24.dp)
+                    .graphicsLayer {
+                        alpha = controlsAlpha
+                        translationY = (1f - controlsAlpha) * 30f
+                    },
             ) {
-                Spacer(Modifier.height(16.dp))
-
                 Row(
                     Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -287,7 +314,7 @@ fun NowPlayingScreen(
                     Icon(
                         Icons.Filled.Shuffle,
                         contentDescription = "Acak",
-                        tint = if (shuffle) c.text else c.textSecondary,
+                        tint = if (shuffle) Fg else FgDim,
                         modifier = Modifier
                             .size(44.dp)
                             .clip(CircleShape)
@@ -297,7 +324,7 @@ fun NowPlayingScreen(
                     Icon(
                         Icons.Filled.FastRewind,
                         contentDescription = "Sebelumnya",
-                        tint = c.text,
+                        tint = Fg,
                         modifier = Modifier
                             .size(56.dp)
                             .clip(CircleShape)
@@ -330,7 +357,7 @@ fun NowPlayingScreen(
                     Icon(
                         Icons.Filled.FastForward,
                         contentDescription = "Berikutnya",
-                        tint = c.text,
+                        tint = Fg,
                         modifier = Modifier
                             .size(56.dp)
                             .clip(CircleShape)
@@ -340,7 +367,7 @@ fun NowPlayingScreen(
                     Icon(
                         Icons.Filled.Repeat,
                         contentDescription = "Ulangi",
-                        tint = if (repeat) c.text else c.textSecondary,
+                        tint = if (repeat) Fg else FgDim,
                         modifier = Modifier
                             .size(44.dp)
                             .clip(CircleShape)
@@ -349,41 +376,36 @@ fun NowPlayingScreen(
                     )
                 }
 
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(24.dp))
 
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Filled.VolumeDown,
                         contentDescription = "Volume kecil",
-                        tint = c.textSecondary,
-                        modifier = Modifier.size(22.dp),
+                        tint = FgDim,
+                        modifier = Modifier.size(20.dp),
                     )
-                    Slider(
+                    SlimSlider(
                         value = volume,
+                        range = 0f..maxVolume.toFloat(),
                         onValueChange = {
                             volume = it
                             audio.setStreamVolume(AudioManager.STREAM_MUSIC, it.roundToInt(), 0)
                         },
-                        valueRange = 0f..maxVolume.toFloat(),
-                        steps = maxVolume - 1,
+                        onValueChangeFinished = {},
                         modifier = Modifier
                             .weight(1f)
                             .padding(horizontal = 12.dp),
-                        colors = SliderDefaults.colors(
-                            thumbColor = c.text,
-                            activeTrackColor = c.text,
-                            inactiveTrackColor = c.divider,
-                        ),
                     )
                     Icon(
                         Icons.Filled.VolumeUp,
                         contentDescription = "Volume besar",
-                        tint = c.textSecondary,
-                        modifier = Modifier.size(22.dp),
+                        tint = FgDim,
+                        modifier = Modifier.size(20.dp),
                     )
                 }
 
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(24.dp))
 
                 Row(
                     Modifier.fillMaxWidth(),
@@ -401,27 +423,82 @@ fun NowPlayingScreen(
     }
 }
 
+/** Progress/volume bar tipis tanpa thumb, seperti Apple Music. Area sentuh 24dp, garis 4dp. */
+@Composable
+private fun SlimSlider(
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    onValueChange: (Float) -> Unit,
+    onValueChangeFinished: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val span = (range.endInclusive - range.start).coerceAtLeast(0.0001f)
+    val fraction = ((value - range.start) / span).coerceIn(0f, 1f)
+    var width by remember { mutableStateOf(1f) }
+    val changed by rememberUpdatedState(onValueChange)
+    val finished by rememberUpdatedState(onValueChangeFinished)
+
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(24.dp)
+            .onSizeChanged { width = it.width.toFloat().coerceAtLeast(1f) }
+            .pointerInput(range) {
+                detectTapGestures(
+                    onTap = { o ->
+                        changed(range.start + (o.x / width).coerceIn(0f, 1f) * span)
+                        finished()
+                    },
+                )
+            }
+            .pointerInput(range) {
+                detectHorizontalDragGestures(
+                    onDragEnd = { finished() },
+                    onDragCancel = { finished() },
+                    onHorizontalDrag = { change, _ ->
+                        change.consume()
+                        changed(range.start + (change.position.x / width).coerceIn(0f, 1f) * span)
+                    },
+                )
+            },
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(CircleShape)
+                .background(TrackOff),
+        )
+        Box(
+            Modifier
+                .fillMaxWidth(fraction)
+                .height(4.dp)
+                .clip(CircleShape)
+                .background(Fg),
+        )
+    }
+}
+
 @Composable
 private fun CircleIcon(icon: ImageVector, description: String) {
-    val c = AppTheme.colors
     Box(
         Modifier
-            .size(44.dp)
+            .size(40.dp)
             .clip(CircleShape)
-            .background(c.control),
+            .background(Color.White.copy(alpha = 0.18f)),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = description, tint = c.text, modifier = Modifier.size(24.dp))
+        Icon(icon, contentDescription = description, tint = Fg, modifier = Modifier.size(22.dp))
     }
 }
 
 @Composable
 private fun BottomAction(icon: ImageVector, label: String) {
-    val c = AppTheme.colors
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(icon, contentDescription = label, tint = c.text, modifier = Modifier.size(28.dp))
+        Icon(icon, contentDescription = label, tint = Fg, modifier = Modifier.size(26.dp))
         Spacer(Modifier.height(4.dp))
-        Text(label, color = c.textSecondary, fontSize = 12.sp)
+        Text(label, color = FgDim, fontSize = 11.sp)
     }
 }
 
