@@ -1,251 +1,295 @@
-package com.example.applemusicui.ui
+package com.example.applemusicui.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.material.icons.filled.FormatQuote
+import androidx.compose.material.icons.filled.IosShare
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import com.example.applemusicui.data.Song
+import com.example.applemusicui.ui.components.Artwork
+import com.example.applemusicui.ui.playback.PlaybackController
+import com.example.applemusicui.ui.theme.AppTheme
+import com.example.applemusicui.ui.theme.AppleRed
 
 @Composable
-fun NowPlayingScreen(
-    imageUrl: String = "",
-    title: String = "Alcohol-Free",
-    artist: String = "TWICE",
-    albumType: String = "Mini Album",
-    currentTime: String = "0:08",
-    duration: String = "3:30",
-    progress: Float = 0.05f,
-    isPlaying: Boolean = false,
-    onPlayPauseToggle: () -> Unit = {},
-    onNext: () -> Unit = {},
-    onPrevious: () -> Unit = {},
-    onDismiss: () -> Unit = {}
-) {
+fun NowPlayingScreen(song: Song, controller: PlaybackController, onClose: () -> Unit) {
+    val c = AppTheme.colors
+    var scrub by remember { mutableStateOf<Float?>(null) }
+    var shuffle by rememberSaveable { mutableStateOf(false) }
+    var repeat by rememberSaveable { mutableStateOf(false) }
+
+    val duration = controller.durationMs.toFloat().coerceAtLeast(1f)
+    val position = controller.positionMs.toFloat().coerceIn(0f, duration)
+    val shown = scrub ?: position
+
     Box(
-        modifier = Modifier
+        Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(c.background)
+            .background(
+                Brush.verticalGradient(
+                    listOf(song.art.first().copy(alpha = 0.75f), c.background),
+                ),
+            ),
     ) {
-        // 1. Background Blur & Gradient
-        Box(modifier = Modifier.fillMaxSize()) {
-            AsyncImage(
-                model = imageUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(radius = 50.dp)
-            )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.4f),
-                                Color.Black.copy(alpha = 0.85f)
-                            ),
-                            startY = 300f
-                        )
-                    )
-            )
-        }
-
-        // 2. Layayout Konten Utama
         Column(
-            modifier = Modifier
+            Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp),
         ) {
-            // Top Bar
+            // Tombol turun
             Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Filled.KeyboardArrowDown,
+                    contentDescription = "Tutup",
+                    tint = c.text,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onClose)
+                        .padding(6.dp),
+                )
+            }
+
+            Spacer(Modifier.size(24.dp))
+
+            // Cover
+            Artwork(
+                colors = song.art,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .statusBarsPadding(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Collapse",
-                        tint = Color.White
+                    .aspectRatio(1f),
+                corner = 14.dp,
+                imageUrl = song.thumbnail,
+            )
+
+            Spacer(Modifier.size(28.dp))
+
+            // Judul + tombol opsi
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        song.title,
+                        color = c.text,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        song.artist,
+                        color = c.textSecondary,
+                        fontSize = 18.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
+                Spacer(Modifier.width(12.dp))
+                CircleIcon(Icons.Filled.MoreHoriz, "Opsi")
+            }
+
+            Spacer(Modifier.size(22.dp))
+
+            // Progres
+            Slider(
+                value = shown,
+                onValueChange = { scrub = it },
+                onValueChangeFinished = {
+                    scrub?.let { controller.seekTo(it.toLong()) }
+                    scrub = null
+                },
+                valueRange = 0f..duration,
+                colors = SliderDefaults.colors(
+                    thumbColor = c.text,
+                    activeTrackColor = c.text,
+                    inactiveTrackColor = c.divider,
+                ),
+            )
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween) {
+                Text(formatTime(shown.toLong()), color = c.textSecondary, fontSize = 13.sp)
                 Text(
-                    text = albumType,
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 14.sp
+                    "-" + formatTime(duration.toLong() - shown.toLong()),
+                    color = c.textSecondary,
+                    fontSize = 13.sp,
                 )
             }
 
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Info Track
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = title,
-                        color = Color.White,
-                        fontSize = 22.sp,
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                    Text(
-                        text = artist,
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 16.sp
-                    )
-                }
-                Row {
-                    IconButton(onClick = { }) {
-                        Icon(
-                            imageVector = Icons.Outlined.FavoriteBorder,
-                            contentDescription = "Favorite",
-                            tint = Color.White
-                        )
-                    }
-                    IconButton(onClick = { }) {
-                        Icon(
-                            imageVector = Icons.Default.MoreHoriz,
-                            contentDescription = "More",
-                            tint = Color.White
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Progress Bar
-            Column {
-                Slider(
-                    value = progress,
-                    onValueChange = {},
-                    colors = SliderDefaults.colors(
-                        thumbColor = Color.Transparent,
-                        activeTrackColor = Color.White,
-                        inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+            if (controller.errorText != null) {
+                Text(
+                    controller.errorText.orEmpty(),
+                    color = AppleRed,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(top = 10.dp),
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(text = currentTime, color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
-                    Text(text = duration, color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
-                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.weight(1f))
 
-            // Playback Controls
+            // Kontrol pemutaran
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
             ) {
-                IconButton(onClick = {}) {
-                    Icon(Icons.Default.Shuffle, contentDescription = "Shuffle", tint = Color.White)
-                }
-                IconButton(onClick = onPrevious) {
-                    Icon(Icons.Default.SkipPrevious, contentDescription = "Previous", tint = Color.White, modifier = Modifier.size(36.dp))
-                }
-                
-                IconButton(
-                    onClick = onPlayPauseToggle,
+                Icon(
+                    Icons.Filled.Shuffle,
+                    contentDescription = "Acak",
+                    tint = if (shuffle) c.text else c.textSecondary,
                     modifier = Modifier
-                        .size(64.dp)
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .clickable { shuffle = !shuffle }
+                        .padding(10.dp),
+                )
+                Icon(
+                    Icons.Filled.FastRewind,
+                    contentDescription = "Sebelumnya",
+                    tint = c.text,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .clickable { controller.previous() }
+                        .padding(14.dp),
+                )
+                Box(
+                    Modifier
+                        .size(76.dp)
                         .clip(CircleShape)
                         .background(Color.White)
+                        .clickable { controller.togglePlay() },
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = "Play/Pause",
-                        tint = Color.Black,
-                        modifier = Modifier.size(36.dp)
-                    )
+                    if (controller.loading) {
+                        CircularProgressIndicator(
+                            Modifier.size(32.dp),
+                            color = Color.Black,
+                            strokeWidth = 3.dp,
+                        )
+                    } else {
+                        Icon(
+                            if (controller.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (controller.isPlaying) "Jeda" else "Putar",
+                            tint = Color.Black,
+                            modifier = Modifier.size(40.dp),
+                        )
+                    }
                 }
-
-                IconButton(onClick = onNext) {
-                    Icon(Icons.Default.SkipNext, contentDescription = "Next", tint = Color.White, modifier = Modifier.size(36.dp))
-                }
-                IconButton(onClick = {}) {
-                    Icon(Icons.Default.Repeat, contentDescription = "Repeat", tint = Color.White)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Volume Slider
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.VolumeDown, contentDescription = null, tint = Color.White.copy(alpha = 0.6f))
-                Slider(
-                    value = 0.7f,
-                    onValueChange = {},
+                Icon(
+                    Icons.Filled.FastForward,
+                    contentDescription = "Berikutnya",
+                    tint = c.text,
                     modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 8.dp),
-                    colors = SliderDefaults.colors(
-                        thumbColor = Color.Transparent,
-                        activeTrackColor = Color.White,
-                        inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-                    )
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .clickable { controller.next() }
+                        .padding(14.dp),
                 )
-                Icon(Icons.Default.VolumeUp, contentDescription = null, tint = Color.White.copy(alpha = 0.6f))
+                Icon(
+                    Icons.Filled.Repeat,
+                    contentDescription = "Ulangi",
+                    tint = if (repeat) c.text else c.textSecondary,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .clickable { repeat = !repeat }
+                        .padding(10.dp),
+                )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.size(28.dp))
 
-            // Bottom Action Bar
+            // Aksi bawah
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color.White.copy(alpha = 0.1f))
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
             ) {
-                BottomActionButton(icon = Icons.Default.Share, label = "Bagikan")
-                BottomActionButton(icon = Icons.Default.ChatBubbleOutline, label = "Lirik")
-                BottomActionButton(icon = Icons.Outlined.FavoriteBorder, label = "Favorit")
-                BottomActionButton(icon = Icons.Default.QueueMusic, label = "Antrean")
+                BottomAction(Icons.Filled.IosShare, "Bagikan")
+                BottomAction(Icons.Filled.FormatQuote, "Lirik")
+                BottomAction(Icons.Filled.FavoriteBorder, "Suka")
+                BottomAction(Icons.Filled.QueueMusic, "Antrean")
             }
+
+            Spacer(Modifier.size(24.dp))
         }
     }
 }
 
 @Composable
-fun BottomActionButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.padding(8.dp)
+private fun CircleIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String) {
+    val c = AppTheme.colors
+    Box(
+        Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(c.control),
+        contentAlignment = Alignment.Center,
     ) {
-        Icon(imageVector = icon, contentDescription = label, tint = Color.White)
-        Text(text = label, color = Color.White, fontSize = 11.sp)
+        Icon(icon, contentDescription = description, tint = c.text, modifier = Modifier.size(24.dp))
     }
+}
+
+@Composable
+private fun BottomAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String) {
+    val c = AppTheme.colors
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(icon, contentDescription = label, tint = c.text, modifier = Modifier.size(28.dp))
+        Spacer(Modifier.size(4.dp))
+        Text(label, color = c.textSecondary, fontSize = 12.sp)
+    }
+}
+
+private fun formatTime(ms: Long): String {
+    val total = ms.coerceAtLeast(0L) / 1000
+    return "%d:%02d".format(total / 60, total % 60)
 }
