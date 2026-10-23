@@ -28,16 +28,17 @@ jobs:
         run: ./gradlew assembleRelease
 
       - name: Sign APK
-        uses: rramer/sign-android-release@v1
+        uses: rbf/build-signer-action@v1.3
         with:
-          releaseDirectory: app/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
-          alias: ${{ secrets.ALIAS }}
-          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
-          keyPassword: ${{ secrets.KEY_PASSWORD }}
+          file: 'app/build/outputs/apk/release/app-release-unsigned.apk'
+          base64-keystore: ${{ secrets.SIGNING_KEY }}
+          keystore-password: ${{ secrets.KEY_STORE_PASSWORD }}
+          key-alias: ${{ secrets.ALIAS }}
+          key-password: ${{ secrets.KEY_PASSWORD }}
 
       - name: Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
           name: ByteBeat-Release
           path: app/build/outputs/apk/release/*.apk
+          
