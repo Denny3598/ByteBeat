@@ -20,6 +20,10 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Grant execute permission for gradlew
+        run: |
+          find . -name "gradlew" -exec chmod +x {} \;
+
       - name: Build Signed Release APK
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
@@ -28,11 +32,9 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           if [ -f "./gradlew" ]; then
-            chmod +x gradlew
             ./gradlew assembleRelease
-          elif [ -f "./ByteBeat/gradlew" ]; then
+          else
             cd ByteBeat
-            chmod +x gradlew
             ./gradlew assembleRelease
           fi
 
@@ -40,5 +42,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ByteBeat-Release
-          path: "**/app/build/outputs/apk/release/*.apk"
+          path: "**/*.apk"
           
