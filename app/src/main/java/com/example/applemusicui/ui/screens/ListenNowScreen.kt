@@ -21,7 +21,7 @@ import com.example.applemusicui.ui.components.SectionHeader
 import com.example.applemusicui.ui.components.SongRow
 
 @Composable
-fun ListenNowScreen(current: Song, onPlay: (Song) -> Unit) {
+fun ListenNowScreen(current: Song, onPlay: (Song, List<Song>) -> Unit) {
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
 
     LazyColumn(
@@ -41,7 +41,9 @@ fun ListenNowScreen(current: Song, onPlay: (Song) -> Unit) {
                 items(DummyData.recentPages) { page ->
                     Column(Modifier.width(screenWidth * 0.88f)) {
                         page.forEach { song ->
-                            SongRow(song, highlighted = song.title == current.title) { onPlay(song) }
+                            SongRow(song, highlighted = song.title == current.title) {
+                                onPlay(song, DummyData.songs)
+                            }
                         }
                     }
                 }
