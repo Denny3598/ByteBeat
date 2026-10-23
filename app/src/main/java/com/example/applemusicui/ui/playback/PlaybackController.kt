@@ -1,16 +1,18 @@
 package com.example.applemusicui.ui.playback
 
+import android.content.ComponentName
 import android.content.Context
+import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.media3.common.AudioAttributes
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultHttpDataSource
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.data.StreamResolver
 import kotlinx.coroutines.CancellationException
@@ -23,24 +25,19 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-/** Pemutar musik: menyimpan lagu aktif, antrean, dan posisi putar untuk UI. */
+/** Pemutar untuk UI. Player aslinya dipegang [SharedPlayer] dan service latar belakang. */
 class PlaybackController(context: Context) {
 
-    private val dataSource = DefaultHttpDataSource.Factory().setUserAgent(USER_AGENT)
+    private val appContext = context.applicationContext
+    private val player: ExoPlayer = SharedPlayer.get(appContext)
 
-    val player: ExoPlayer = ExoPlayer.Builder(context)
-        .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
-        .setAudioAttributes(AudioAttributes.DEFAULT, true)
-        .setHandleAudioBecomingNoisy(true)
-        .build()
-
-    var current by mutableStateOf<Song?>(null)
+    var current: Song? by mutableStateOf<Song?>(null)
         private set
-    var isPlaying by mutableStateOf(false)
+    var isPlaying by mutableStateOf(player.isPlaying)
         private set
     var loading by mutableStateOf(false)
         private set
-    var errorText by mutableStateOf<String?>(null)
+    var errorText: String? by mutableStateOf<String?>(null)
         private set
     var positionMs by mutableLongStateOf(0L)
         private set
@@ -51,20 +48,27 @@ class PlaybackController(context: Context) {
     private var loadJob: Job? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+    private val listener = object : Player.Listener {
+        override fun onIsPlayingChanged(playing: Boolean) {
+            isPlaying = playing
+        }
+
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            if (playbackState == Player.STATE_READY) {
+                durationMs = player.duration.coerceAtLeast(0L)
+            }
+            if (playbackState == Player.STATE_ENDED) next()
+        }
+    }
+
+    // Membuat koneksi ke service, sehingga service ikut hidup dan notifikasi muncul.
+    private val browserFuture = MediaController.Builder(
+        appContext,
+        SessionToken(appContext, ComponentName(appContext, MusicPlaybackService::class.java)),
+    ).buildAsync()
+
     init {
-        player.addListener(object : Player.Listener {
-            override fun onIsPlayingChanged(playing: Boolean) {
-                isPlaying = playing
-            }
-
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_READY) {
-                    durationMs = player.duration.coerceAtLeast(0L)
-                }
-                if (playbackState == Player.STATE_ENDED) next()
-            }
-        })
-
+        player.addListener(listener)
         // Posisi diperbarui 4 kali per detik untuk slider dan waktu.
         scope.launch {
             while (isActive) {
@@ -86,15 +90,25 @@ class PlaybackController(context: Context) {
         loadJob = scope.launch {
             try {
                 val url = StreamResolver.audioUrl(song.url)
-                player.setMediaItem(MediaItem.fromUri(url))
+                val item = MediaItem.Builder()
+                    .setUri(url)
+                    .setMediaMetadata(
+                        MediaMetadata.Builder()
+                            .setTitle(song.title)
+                            .setArtist(song.artist)
+                            .setArtworkUri(song.thumbnail?.let { Uri.parse(it) })
+                            .build(),
+                    )
+                    .build()
+                player.setMediaItem(item)
                 player.prepare()
                 player.play()
+                loading = false
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 player.stop()
                 errorText = e.message ?: "Gagal memutar lagu ini"
-            } finally {
                 loading = false
             }
         }
@@ -127,14 +141,10 @@ class PlaybackController(context: Context) {
         positionMs = ms
     }
 
+    /** Hanya melepas listener dan koneksi UI. Musik tetap berjalan di service. */
     fun release() {
+        player.removeListener(listener)
         scope.cancel()
-        player.release()
-    }
-
-    companion object {
-        // Sama dengan User-Agent di DownloaderImpl, supaya alamat audio diterima YouTube.
-        private const val USER_AGENT =
-            "Mozilla/5.0 (Windows NT 10.0; rv:128.0) Gecko/20100101 Firefox/128.0"
+        MediaController.releaseFuture(browserFuture)
     }
 }
