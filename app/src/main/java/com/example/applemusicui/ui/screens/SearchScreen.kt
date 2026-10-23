@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -49,6 +50,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.applemusicui.data.AppPrefs
 import com.example.applemusicui.data.RecentSearch
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.data.YouTubeMusicRepository
@@ -65,6 +67,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun SearchScreen(current: Song, onPlay: (Song, List<Song>) -> Unit) {
     val c = AppTheme.colors
+    val context = LocalContext.current
     var query by rememberSaveable { mutableStateOf("") }
     var tab by rememberSaveable { mutableStateOf(0) }
     val recents = remember { mutableStateListOf<RecentSearch>().apply { addAll(defaultRecentSearches) } }
@@ -87,7 +90,10 @@ fun SearchScreen(current: Song, onPlay: (Song, List<Song>) -> Unit) {
         loading = true
         errorText = null
         try {
-            results = YouTubeMusicRepository.searchSongs(q)
+            results = YouTubeMusicRepository.searchSongs(
+                q,
+                songsOnly = AppPrefs.prefs(context).getBoolean("music_only", true),
+            )
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -129,11 +135,11 @@ fun SearchScreen(current: Song, onPlay: (Song, List<Song>) -> Unit) {
                         onActionClick = { recents.clear() },
                     )
                 }
-                items(recents, key = { it.title }) { item ->
+                items(recents, key = { it.title }) { entry ->
                     RecentRow(
-                        item = item,
-                        onClick = { query = item.title },
-                        onRemove = { recents.remove(item) },
+                        item = entry,
+                        onClick = { query = entry.title },
+                        onRemove = { recents.remove(entry) },
                     )
                 }
             }
