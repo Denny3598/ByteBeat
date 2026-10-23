@@ -90,17 +90,14 @@ fun Avatar(modifier: Modifier = Modifier, size: Dp = 46.dp) {
     Box(
         modifier
             .size(size)
-            .border(2.dp, AppleRed, CircleShape)
-            .padding(4.dp)
             .clip(CircleShape)
-            .clickable(onClick = onClick)
-            .background(Brush.linearGradient(listOf(c.textSecondary, c.surface))),
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            Icons.Filled.Person,
-            contentDescription = "Pengaturan tampilan",
-            tint = c.text.copy(alpha = 0.7f),
+            Icons.Filled.MoreVert,
+            contentDescription = "Pengaturan",
+            tint = c.text,
             modifier = Modifier.size(size / 2),
         )
     }
