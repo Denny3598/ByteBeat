@@ -15,6 +15,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -35,6 +37,7 @@ import com.example.applemusicui.ui.components.LocalOnAvatarClick
 import com.example.applemusicui.ui.components.MiniPlayer
 import com.example.applemusicui.ui.components.PillTabBar
 import com.example.applemusicui.ui.playback.PlaybackController
+import com.example.applemusicui.ui.screens.DetailPageScreen
 import com.example.applemusicui.ui.screens.ExploreScreen
 import com.example.applemusicui.ui.screens.LibraryScreen
 import com.example.applemusicui.ui.screens.ListenNowScreen
@@ -59,6 +62,11 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
     var showLogin by rememberSaveable { mutableStateOf(false) }
     var loggedIn by remember { mutableStateOf(AppPrefs.isLoggedIn()) }
 
+    // Tumpukan halaman detail (album/artis). Halaman paling atas adalah yang terakhir.
+    val pages = remember { mutableStateListOf<String>() }
+    val openPage: (String) -> Unit = { id -> pages.add(id) }
+    val closePage: () -> Unit = { if (pages.isNotEmpty()) pages.removeAt(pages.lastIndex) }
+
     val c = AppTheme.colors
     val current = controller.current
     val highlight = current ?: DummyData.songs.first()
@@ -77,6 +85,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
     BackHandler(enabled = showNowPlaying) { showNowPlaying = false }
     BackHandler(enabled = showSettings) { showSettings = false }
     BackHandler(enabled = showLogin) { showLogin = false }
+    BackHandler(enabled = pages.isNotEmpty()) { closePage() }
 
     CompositionLocalProvider(LocalOnAvatarClick provides { showSettings = true }) {
         Box(
@@ -85,10 +94,22 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
                 .background(c.background),
         ) {
             when (tab) {
-                AppTab.Home -> ListenNowScreen(highlight, play)
+                AppTab.Home -> ListenNowScreen(highlight, play, openPage)
                 AppTab.Explore -> ExploreScreen()
-                AppTab.Library -> LibraryScreen(onPlay = play)
+                AppTab.Library -> LibraryScreen(onPlay = play, onOpenPage = openPage)
                 AppTab.Search -> SearchScreen(highlight, play)
+            }
+
+            // Halaman detail menutupi konten tab, tapi mini player dan tab bar tetap di atasnya.
+            pages.lastOrNull()?.let { id ->
+                key(id) {
+                    DetailPageScreen(
+                        browseId = id,
+                        onPlay = play,
+                        onOpenPage = openPage,
+                        onBack = closePage,
+                    )
+                }
             }
 
             // Mini player + tab bar melayang di atas konten.
@@ -115,7 +136,14 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
                     }
                     Spacer(Modifier.height(10.dp))
                 }
-                PillTabBar(selected = tab, onSelect = { tab = it })
+                PillTabBar(
+                    selected = tab,
+                    onSelect = {
+                        // Ganti tab menutup halaman detail yang sedang terbuka.
+                        pages.clear()
+                        tab = it
+                    },
+                )
             }
 
             if (showNowPlaying && current != null) {
