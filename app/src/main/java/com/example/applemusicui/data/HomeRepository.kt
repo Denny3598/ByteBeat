@@ -50,26 +50,65 @@ object HomeRepository {
         .build()
     private val jsonType = "application/json; charset=utf-8".toMediaType()
 
+    /**
+     * Membaca setiap section di beranda, seperti parser BitChord:
+     * rak kartu (musicCarouselShelfRenderer) dan rak daftar (musicShelfRenderer, misalnya "Recents").
+     */
     suspend fun shelves(): List<HomeShelf> = withContext(Dispatchers.IO) {
         val root = browse("FEmusic_home")
-        val carousels = mutableListOf<JSONObject>()
-        collect(root, "musicCarouselShelfRenderer", carousels)
-        carousels.mapNotNull { shelf ->
-            val header = shelf.optJSONObject("header")
-                ?.optJSONObject("musicCarouselShelfBasicHeaderRenderer")
-            val title = textOf(header?.optJSONObject("title")) ?: return@mapNotNull null
-            val subtitle = textOf(header?.optJSONObject("strapline")).orEmpty()
+        val sections = root.optJSONObject("contents")
+            ?.optJSONObject("singleColumnBrowseResultsRenderer")
+            ?.optJSONArray("tabs")
+            ?.optJSONObject(0)
+            ?.optJSONObject("tabRenderer")
+            ?.optJSONObject("content")
+            ?.optJSONObject("sectionListRenderer")
+            ?.optJSONArray("contents")
 
-            val contents = shelf.optJSONArray("contents") ?: JSONArray()
-            val two = mutableListOf<JSONObject>()
-            collect(contents, "musicTwoRowItemRenderer", two)
-            val responsive = mutableListOf<JSONObject>()
-            collect(contents, "musicResponsiveListItemRenderer", responsive)
-
-            val items = (two.mapNotNull { parseItem(it) } + responsive.mapNotNull { parseResponsive(it) })
-                .distinctBy { it.videoId ?: it.browseId }
-            if (items.isEmpty()) null else HomeShelf(title, items, subtitle)
+        val result = mutableListOf<HomeShelf>()
+        if (sections != null) {
+            for (i in 0 until sections.length()) {
+                val section = sections.optJSONObject(i) ?: continue
+                val shelf = section.optJSONObject("musicCarouselShelfRenderer")?.let { carouselShelf(it) }
+                    ?: section.optJSONObject("musicShelfRenderer")?.let { plainShelf(it) }
+                if (shelf != null) result += shelf
+            }
         }
+        // Kalau struktur section berubah, cadangannya: cari semua rak kartu di mana pun dalam JSON.
+        if (result.isEmpty()) {
+            val carousels = mutableListOf<JSONObject>()
+            collect(root, "musicCarouselShelfRenderer", carousels)
+            carousels.mapNotNullTo(result) { carouselShelf(it) }
+        }
+        result
+    }
+
+    /** Rak kartu: judul dan subjudul besar, lalu item berupa kartu (album, playlist, atau lagu). */
+    private fun carouselShelf(carousel: JSONObject): HomeShelf? {
+        val header = carousel.optJSONObject("header")
+            ?.optJSONObject("musicCarouselShelfBasicHeaderRenderer")
+        val title = textOf(header?.optJSONObject("title")) ?: return null
+        val subtitle = textOf(header?.optJSONObject("strapline")).orEmpty()
+        val contents = carousel.optJSONArray("contents") ?: return null
+        val items = mutableListOf<HomeCardItem>()
+        for (i in 0 until contents.length()) {
+            val item = contents.optJSONObject(i) ?: continue
+            item.optJSONObject("musicTwoRowItemRenderer")?.let { parseItem(it) }?.let { items += it }
+            item.optJSONObject("musicResponsiveListItemRenderer")?.let { parseResponsive(it) }?.let { items += it }
+        }
+        return if (items.isEmpty()) null else HomeShelf(title, items.distinctBy { it.videoId ?: it.browseId }, subtitle)
+    }
+
+    /** Rak daftar: baris lagu bergaya list, misalnya "Recents". */
+    private fun plainShelf(shelf: JSONObject): HomeShelf? {
+        val title = textOf(shelf.optJSONObject("title")).orEmpty().ifBlank { "Untuk kamu" }
+        val contents = shelf.optJSONArray("contents") ?: return null
+        val items = mutableListOf<HomeCardItem>()
+        for (i in 0 until contents.length()) {
+            val row = contents.optJSONObject(i)?.optJSONObject("musicResponsiveListItemRenderer") ?: continue
+            parseResponsive(row)?.let { items += it }
+        }
+        return if (items.isEmpty()) null else HomeShelf(title, items.distinctBy { it.videoId ?: it.browseId })
     }
 
     private fun parseItem(r: JSONObject): HomeCardItem? {
@@ -100,7 +139,7 @@ object HomeRepository {
         )
     }
 
-    /** Baris lagu gaya daftar (dipakai rak "Dengarkan lagi"). */
+    /** Baris lagu gaya daftar (dipakai rak "Recents"). */
     private fun parseResponsive(r: JSONObject): HomeCardItem? {
         val title = flexText(r, 0) ?: return null
         val videoId = r.optJSONObject("playlistItemData")
