@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -152,6 +153,10 @@ fun ExploreScreen() {
 @Composable
 private fun MoodCard(mood: ExploreMood, modifier: Modifier = Modifier) {
     val tone = remember(mood.color) { moodTone(mood.color) }
+    // Cover diambil sendiri oleh kartu ini, jadi daftar kategori tampil lebih dulu.
+    val cover by produceState<String?>(mood.coverUrl, mood.browseId, mood.params) {
+        if (value == null) value = ExploreRepository.coverFor(mood.browseId, mood.params)
+    }
     Box(
         modifier
             .aspectRatio(1.72f)
@@ -165,7 +170,7 @@ private fun MoodCard(mood: ExploreMood, modifier: Modifier = Modifier) {
                 .fillMaxWidth(0.72f)
                 .background(tone.placeholder),
         ) {
-            mood.coverUrl?.let { url ->
+            cover?.let { url ->
                 AsyncImage(
                     model = url,
                     contentDescription = null,

@@ -1,8 +1,17 @@
 package com.example.applemusicui.ui.screens
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -78,14 +87,7 @@ fun ListenNowScreen(
 
         val list = shelves
         when {
-            list == null -> Box(
-                Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator()
-            }
+            list == null -> SkeletonHome(Modifier.weight(1f))
 
             list.isEmpty() -> Box(
                 Modifier
@@ -282,6 +284,69 @@ private fun SquareCard(item: HomeCardItem, onClick: () -> Unit) {
 private fun isCurrent(item: HomeCardItem, current: Song): Boolean {
     val vid = item.videoId ?: return false
     return current.url.contains("v=$vid")
+}
+
+/** Kerangka abu-abu saat beranda dimuat, dengan kilau yang berjalan (seperti di video). */
+@Composable
+private fun SkeletonHome(modifier: Modifier) {
+    val c = AppTheme.colors
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val alpha by transition.animateFloat(
+        initialValue = 0.10f,
+        targetValue = 0.22f,
+        animationSpec = infiniteRepeatable(animation = tween(900), repeatMode = RepeatMode.Reverse),
+        label = "shimmerAlpha",
+    )
+    val block = c.textSecondary.copy(alpha = alpha)
+    Column(modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+        SkeletonBar(block, 120.dp, 22.dp)
+        Spacer(Modifier.height(14.dp))
+        repeat(4) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.size(56.dp).clip(RoundedCornerShape(6.dp)).background(block))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    SkeletonBar(block, 180.dp, 14.dp)
+                    Spacer(Modifier.height(8.dp))
+                    SkeletonBar(block, 120.dp, 12.dp)
+                }
+            }
+        }
+        Spacer(Modifier.height(26.dp))
+        SkeletonBar(block, 170.dp, 22.dp)
+        Spacer(Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            repeat(2) {
+                Column(Modifier.width(170.dp)) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(170.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(block),
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    SkeletonBar(block, 130.dp, 14.dp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SkeletonBar(color: Color, width: Dp, height: Dp) {
+    Box(
+        Modifier
+            .width(width)
+            .height(height)
+            .clip(RoundedCornerShape(6.dp))
+            .background(color),
+    )
 }
 
 private fun HomeCardItem.toSong(): Song? {
