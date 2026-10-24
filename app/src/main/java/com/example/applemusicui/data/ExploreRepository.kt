@@ -30,12 +30,20 @@ object ExploreRepository {
     private const val USER_AGENT =
         "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36"
 
+    // callTimeout = batas total satu permintaan, supaya tidak pernah menggantung.
+    // Batas koneksi per host dinaikkan agar cover banyak kategori bisa diambil bersamaan.
     private val http = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .callTimeout(12, TimeUnit.SECONDS)
         .build()
+        .also {
+            it.dispatcher.maxRequests = 32
+            it.dispatcher.maxRequestsPerHost = 16
+        }
     private val jsonType = "application/json; charset=utf-8".toMediaType()
 
+    /** Melempar exception kalau halaman utama gagal dimuat, supaya layar bisa menampilkan pesannya. */
     suspend fun moods(): List<ExploreMood> = coroutineScope {
         val root = withContext(Dispatchers.IO) { browse("FEmusic_moods_and_genres", null) }
         val buttons = mutableListOf<JSONObject>()
@@ -53,7 +61,7 @@ object ExploreRepository {
             ExploreMood(title, color, browseId, params, coverUrl = null)
         }
 
-        // Ambil cover tiap kategori secara paralel.
+        // Ambil cover tiap kategori secara paralel. Kalau satu gagal, kartunya tetap tampil tanpa cover.
         base.map { m ->
             async(Dispatchers.IO) { m.copy(coverUrl = coverFor(m.browseId, m.params)) }
         }.awaitAll()
@@ -125,6 +133,11 @@ object ExploreRepository {
             ?.optJSONObject("thumbnail")
             ?.optJSONArray("thumbnails") ?: return null
         if (arr.length() == 0) return null
-        return arr.getJSONObject(arr.length() - 1).optString("url").takeIf { it.isNotBlank() }
+        val url = arr.getJSONObject(arr.length() - 1).optString("url").takeIf { it.isNotBlank() }
+            ?: return null
+        // Cover HD untuk kartu Jelajahi.
+        return url
+            .replace(Regex("=w\\d+-h\\d+"), "=w1200-h1200")
+            .replace(Regex("=s\\d+"), "=s1200")
     }
 }
