@@ -26,11 +26,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -67,6 +65,7 @@ import com.example.applemusicui.ui.screens.ListenNowScreen
 import com.example.applemusicui.ui.screens.AboutScreen
 import com.example.applemusicui.ui.components.UpdateDialog
 import com.example.applemusicui.data.UpdateInfo
+import kotlinx.coroutines.delay
 import com.example.applemusicui.data.UpdateRepository
 import com.example.applemusicui.ui.screens.CategoryScreen
 import com.example.applemusicui.ui.screens.categoryKey
@@ -94,9 +93,16 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
     // Pembaruan yang ditemukan; kalau tidak null, popup unduhan ditampilkan.
     var update by remember { mutableStateOf<UpdateInfo?>(null) }
 
-    // Cek pembaruan diam-diam saat aplikasi dibuka. Gagal atau sudah terbaru: tidak ada popup.
+    // Cek pembaruan saat aplikasi dibuka. Kalau gagal (sinyal hilang, dll.), dicoba lagi sampai 3 kali.
     LaunchedEffect(Unit) {
-        update = runCatching { UpdateRepository.newerRelease() }.getOrNull()
+        repeat(3) {
+            val result = runCatching { UpdateRepository.newerRelease() }
+            if (result.isSuccess) {
+                update = result.getOrNull()
+                return@LaunchedEffect
+            }
+            delay(10_000L)
+        }
     }
     // Pustaka dimuat sejak awal, supaya saat tab Pustaka dibuka datanya sudah ada.
     LaunchedEffect(Unit) {
