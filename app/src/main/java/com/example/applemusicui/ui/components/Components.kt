@@ -1,7 +1,9 @@
 package com.example.applemusicui.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -35,7 +37,10 @@ import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -168,41 +173,55 @@ fun SectionHeader(
     }
 }
 
+/** Baris lagu. Ditahan = popup aksi; titik tiga = sheet aksi. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SongRow(song: Song, highlighted: Boolean, onClick: () -> Unit) {
     val c = AppTheme.colors
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Artwork(song.art, Modifier.size(56.dp), corner = 6.dp, imageUrl = song.thumbnail)
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                song.title,
-                color = if (highlighted) AppleRed else c.text,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                song.artist,
-                color = c.textSecondary,
-                fontSize = 15.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+    var menu by remember { mutableStateOf<SongMenuStyle?>(null) }
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = { menu = SongMenuStyle.Popup },
+                )
+                .padding(vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Artwork(song.art, Modifier.size(56.dp), corner = 6.dp, imageUrl = song.thumbnail)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    song.title,
+                    color = if (highlighted) AppleRed else c.text,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    song.artist,
+                    color = c.textSecondary,
+                    fontSize = 15.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Icon(
+                Icons.Filled.MoreVert,
+                contentDescription = "Opsi",
+                tint = c.textSecondary,
+                modifier = Modifier
+                    .size(28.dp)
+                    .clickable { menu = SongMenuStyle.Sheet }
+                    .padding(4.dp),
             )
         }
-        Icon(
-            Icons.Filled.MoreVert,
-            contentDescription = "Opsi",
-            tint = c.textSecondary,
-            modifier = Modifier.size(20.dp),
-        )
+        menu?.let { style ->
+            SongMenuHost(song = song, style = style, onDismiss = { menu = null })
+        }
     }
 }
 
