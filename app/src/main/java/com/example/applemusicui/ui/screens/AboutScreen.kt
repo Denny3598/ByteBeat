@@ -33,6 +33,11 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,16 +53,43 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.applemusicui.data.UpdateInfo
+import com.example.applemusicui.data.UpdateRepository
 import com.example.applemusicui.ui.theme.AppTheme
+import kotlinx.coroutines.launch
 
-/** Halaman tentang aplikasi: logo, deskripsi, tautan media sosial, ucapan terima kasih. */
+/** Halaman tentang aplikasi: logo, deskripsi, tautan media sosial, cek pembaruan, dan ucapan terima kasih. */
 @Composable
-fun AboutScreen(onBack: () -> Unit) {
+fun AboutScreen(
+    onBack: () -> Unit,
+    onUpdateFound: (UpdateInfo) -> Unit,
+) {
     val c = AppTheme.colors
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var checking by remember { mutableStateOf(false) }
+    var updateStatus by remember { mutableStateOf("Tap to check for the latest build") }
 
     fun openUrl(url: String) {
         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+    }
+
+    fun checkForUpdates() {
+        if (checking) return
+        checking = true
+        updateStatus = "Checking…"
+        scope.launch {
+            val result = runCatching { UpdateRepository.newerRelease() }
+            checking = false
+            updateStatus = when {
+                result.isFailure -> "Couldn't check. Try again later."
+                result.getOrNull() == null -> "You're up to date"
+                else -> {
+                    onUpdateFound(result.getOrNull()!!)
+                    "New version available"
+                }
+            }
+        }
     }
 
     Column(
@@ -103,6 +135,24 @@ fun AboutScreen(onBack: () -> Unit) {
                     lineHeight = 26.sp,
                     textAlign = TextAlign.Center,
                 )
+            }
+        }
+
+        // Cek pembaruan.
+        Spacer(Modifier.height(16.dp))
+        AboutCard {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = !checking) { checkForUpdates() },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.Refresh, contentDescription = null, tint = c.text, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Check for updates", color = c.text, fontSize = 17.sp)
+                    Text(updateStatus, color = c.textSecondary, fontSize = 14.sp)
+                }
             }
         }
 
@@ -158,19 +208,6 @@ fun AboutScreen(onBack: () -> Unit) {
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
                 Text("Claude AI", color = Color(0xFFB0102A), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            }
-        }
-
-        // Pembaruan dan versi.
-        Spacer(Modifier.height(16.dp))
-        AboutCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Refresh, contentDescription = null, tint = c.text, modifier = Modifier.size(24.dp))
-                Spacer(Modifier.width(16.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("Check for updates (beta)", color = c.text, fontSize = 17.sp)
-                    Text("Coming soon", color = c.textSecondary, fontSize = 14.sp)
-                }
             }
         }
 
