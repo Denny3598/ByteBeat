@@ -57,6 +57,8 @@ import com.example.applemusicui.data.LibraryItem
 import com.example.applemusicui.data.LibraryRepository
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.components.Artwork
+import com.example.applemusicui.ui.components.PageMenuCard
+import com.example.applemusicui.ui.components.PageMenuTarget
 import com.example.applemusicui.ui.components.ScreenHeader
 import com.example.applemusicui.ui.theme.AppTheme
 import com.example.applemusicui.ui.theme.AppleRed
@@ -196,7 +198,7 @@ fun LibraryScreen(
                                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                                     ) {
                                         items(list.take(12), key = { it.browseId }) { item ->
-                                            LibraryCard(item, busy = busyId == item.browseId) { open(item) }
+                                            LibraryCard(item, busy = busyId == item.browseId, onPlay = onPlay) { open(item) }
                                         }
                                     }
                                 }
@@ -249,6 +251,7 @@ fun LibraryScreen(
                         item = item,
                         busy = busyId == item.browseId,
                         modifier = Modifier.fillMaxWidth(),
+                        onPlay = onPlay,
                     ) { open(item) }
                 }
             }
@@ -288,10 +291,24 @@ private fun LibraryCard(
     item: LibraryItem,
     busy: Boolean,
     modifier: Modifier = Modifier.width(160.dp),
+    onPlay: (Song, List<Song>) -> Unit = { _, _ -> },
     onClick: () -> Unit,
 ) {
+    // Ketuk untuk membuka halaman, tahan untuk popup Putar, Acak, Buka, dan Bagikan.
+    PageMenuCard(
+        target = PageMenuTarget(item.browseId, item.title, item.subtitle, item.thumbnail),
+        modifier = modifier,
+        onPlay = onPlay,
+        onClick = onClick,
+    ) {
+        LibraryCardBody(item, busy)
+    }
+}
+
+@Composable
+private fun LibraryCardBody(item: LibraryItem, busy: Boolean) {
     val c = AppTheme.colors
-    Column(modifier.clickable(onClick = onClick)) {
+    Column(Modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth()) {
             Artwork(
                 listOf(AppleRed, c.surface),

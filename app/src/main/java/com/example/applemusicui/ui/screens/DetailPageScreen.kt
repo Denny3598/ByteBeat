@@ -1,7 +1,9 @@
 package com.example.applemusicui.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -60,6 +62,10 @@ import com.example.applemusicui.data.PodcastDetail
 import com.example.applemusicui.data.PodcastEpisode
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.components.Artwork
+import com.example.applemusicui.ui.components.PageMenuCard
+import com.example.applemusicui.ui.components.PageMenuTarget
+import com.example.applemusicui.ui.components.SongMenuHost
+import com.example.applemusicui.ui.components.SongMenuStyle
 import com.example.applemusicui.ui.components.rememberCoverTint
 import com.example.applemusicui.ui.theme.AppTheme
 import com.example.applemusicui.ui.theme.AppleRed
@@ -435,7 +441,7 @@ private fun ArtistBody(
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         items(page.albums, key = { it.browseId }) { album ->
-                            AlbumCard(album) { onOpenPage(album.browseId) }
+                            AlbumCard(album, onPlay) { onOpenPage(album.browseId) }
                         }
                     }
                 }
@@ -532,14 +538,16 @@ private fun PodcastBody(page: PodcastDetail, onPlay: (Song, List<Song>) -> Unit)
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun EpisodeRow(episode: PodcastEpisode, onClick: () -> Unit) {
     val c = AppTheme.colors
     val meta = listOfNotNull(episode.dateText, episode.durationText).joinToString("  •  ")
+    var menu by remember { mutableStateOf<SongMenuStyle?>(null) }
     Column {
         Row(
             Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick)
+                .combinedClickable(onClick = onClick, onLongClick = { menu = SongMenuStyle.Popup })
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -588,6 +596,9 @@ private fun EpisodeRow(episode: PodcastEpisode, onClick: () -> Unit) {
                     )
                 }
             }
+        }
+        menu?.let { style ->
+            SongMenuHost(song = episode.song, style = style, onDismiss = { menu = null })
         }
         HorizontalDivider(
             modifier = Modifier.padding(start = 122.dp),
@@ -708,13 +719,15 @@ private fun SectionTitle(title: String) {
 
 /** Satu baris lagu dengan cover kecil di kiri, seperti daftar lagu di aplikasi musik modern. */
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun TrackRow(song: Song, onClick: () -> Unit) {
     val c = AppTheme.colors
+    var menu by remember { mutableStateOf<SongMenuStyle?>(null) }
     Column {
         Row(
             Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick)
+                .combinedClickable(onClick = onClick, onLongClick = { menu = SongMenuStyle.Popup })
                 .padding(horizontal = 20.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -745,6 +758,9 @@ private fun TrackRow(song: Song, onClick: () -> Unit) {
                 }
             }
         }
+        menu?.let { style ->
+            SongMenuHost(song = song, style = style, onDismiss = { menu = null })
+        }
         HorizontalDivider(
             modifier = Modifier.padding(start = 86.dp),
             thickness = 0.5.dp,
@@ -754,9 +770,21 @@ private fun TrackRow(song: Song, onClick: () -> Unit) {
 }
 
 @Composable
-private fun AlbumCard(item: LibraryItem, onClick: () -> Unit) {
+private fun AlbumCard(item: LibraryItem, onPlay: (Song, List<Song>) -> Unit, onClick: () -> Unit) {
+    PageMenuCard(
+        target = PageMenuTarget(item.browseId, item.title, item.subtitle, item.thumbnail),
+        modifier = Modifier.width(150.dp),
+        onPlay = onPlay,
+        onClick = onClick,
+    ) {
+        AlbumCardBody(item)
+    }
+}
+
+@Composable
+private fun AlbumCardBody(item: LibraryItem) {
     val c = AppTheme.colors
-    Column(Modifier.width(150.dp).clickable(onClick = onClick)) {
+    Column(Modifier.fillMaxWidth()) {
         Artwork(
             listOf(AppleRed, c.surface),
             Modifier

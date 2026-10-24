@@ -50,6 +50,8 @@ import com.example.applemusicui.data.SearchResults
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.data.YouTubeMusicRepository
 import com.example.applemusicui.ui.components.Artwork
+import com.example.applemusicui.ui.components.PageMenuCard
+import com.example.applemusicui.ui.components.PageMenuTarget
 import com.example.applemusicui.ui.components.ScreenHeader
 import com.example.applemusicui.ui.components.SongRow
 import com.example.applemusicui.ui.theme.AppTheme
@@ -262,7 +264,7 @@ fun SearchScreen(
                     if (found.artists.isNotEmpty()) {
                         item { SectionTitle("Artis") }
                         item {
-                            CollectionRow(found.artists, round = true, onOpen = onOpenPage)
+                            CollectionRow(found.artists, round = true, onPlay = onPlay, onOpen = onOpenPage)
                         }
                     }
                     if (found.songs.isNotEmpty()) {
@@ -276,13 +278,13 @@ fun SearchScreen(
                     if (found.albums.isNotEmpty()) {
                         item { SectionTitle("Album") }
                         item {
-                            CollectionRow(found.albums, round = false, onOpen = onOpenPage)
+                            CollectionRow(found.albums, round = false, onPlay = onPlay, onOpen = onOpenPage)
                         }
                     }
                     if (found.playlists.isNotEmpty()) {
                         item { SectionTitle("Playlist") }
                         item {
-                            CollectionRow(found.playlists, round = false, onOpen = onOpenPage)
+                            CollectionRow(found.playlists, round = false, onPlay = onPlay, onOpen = onOpenPage)
                         }
                     }
                 }
@@ -304,27 +306,44 @@ private fun SectionTitle(title: String) {
 
 /** Deretan kartu horizontal. Artis dibuat bulat, album dan playlist persegi. */
 @Composable
-private fun CollectionRow(list: List<LibraryItem>, round: Boolean, onOpen: (String) -> Unit) {
+private fun CollectionRow(
+    list: List<LibraryItem>,
+    round: Boolean,
+    onPlay: (Song, List<Song>) -> Unit,
+    onOpen: (String) -> Unit,
+) {
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         contentPadding = PaddingValues(bottom = 4.dp),
     ) {
         items(list) { item ->
-            CollectionCard(item, round) { onOpen(item.browseId) }
+            CollectionCard(item, round, onPlay) { onOpen(item.browseId) }
         }
     }
 }
 
 @Composable
-private fun CollectionCard(item: LibraryItem, round: Boolean, onClick: () -> Unit) {
+private fun CollectionCard(item: LibraryItem, round: Boolean, onPlay: (Song, List<Song>) -> Unit, onClick: () -> Unit) {
+    val size: Dp = if (round) 130.dp else 150.dp
+    // Ketuk untuk membuka halaman, tahan untuk popup Putar, Acak, Buka, dan Bagikan.
+    PageMenuCard(
+        target = PageMenuTarget(item.browseId, item.title, item.subtitle, item.thumbnail),
+        modifier = Modifier.width(size),
+        onPlay = onPlay,
+        onClick = onClick,
+    ) {
+        CollectionCardBody(item, round)
+    }
+}
+
+@Composable
+private fun CollectionCardBody(item: LibraryItem, round: Boolean) {
     val c = AppTheme.colors
     val size: Dp = if (round) 130.dp else 150.dp
     val align = if (round) Alignment.CenterHorizontally else Alignment.Start
     val textAlign = if (round) TextAlign.Center else TextAlign.Start
     Column(
-        Modifier
-            .width(size)
-            .clickable(onClick = onClick),
+        Modifier.fillMaxWidth(),
         horizontalAlignment = align,
     ) {
         Artwork(

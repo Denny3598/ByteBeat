@@ -54,6 +54,8 @@ import com.example.applemusicui.data.HomeRepository
 import com.example.applemusicui.data.HomeShelf
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.components.Artwork
+import com.example.applemusicui.ui.components.PageMenuCard
+import com.example.applemusicui.ui.components.PageMenuTarget
 import com.example.applemusicui.ui.components.ScreenHeader
 import com.example.applemusicui.ui.components.SongMenuHost
 import com.example.applemusicui.ui.components.SongMenuStyle
@@ -142,7 +144,7 @@ fun ListenNowScreen(
                         if (index == 0) {
                             RecentsShelf(shelf, current) { item -> open(item, shelf) }
                         } else {
-                            SquareShelf(shelf) { item -> open(item, shelf) }
+                            SquareShelf(shelf, onPlay) { item -> open(item, shelf) }
                         }
                     }
                 }
@@ -271,7 +273,7 @@ private fun ListRow(item: HomeCardItem, highlighted: Boolean, onClick: () -> Uni
 
 /** Rak biasa: deretan kartu persegi besar dengan judul dan subjudul. */
 @Composable
-private fun SquareShelf(shelf: HomeShelf, onClick: (HomeCardItem) -> Unit) {
+private fun SquareShelf(shelf: HomeShelf, onPlay: (Song, List<Song>) -> Unit, onClick: (HomeCardItem) -> Unit) {
     Column(Modifier.padding(bottom = 16.dp)) {
         ShelfTitle(shelf.title, shelf.subtitle)
         LazyRow(
@@ -279,20 +281,27 @@ private fun SquareShelf(shelf: HomeShelf, onClick: (HomeCardItem) -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             items(shelf.items) { item ->
-                SquareCard(item) { onClick(item) }
+                SquareCard(item, onPlay) { onClick(item) }
             }
         }
     }
 }
 
 @Composable
-private fun SquareCard(item: HomeCardItem, onClick: () -> Unit) {
+private fun SquareCard(item: HomeCardItem, onPlay: (Song, List<Song>) -> Unit, onClick: () -> Unit) {
+    // Album, playlist, artis, dan podcast bisa ditahan untuk popup. Lagu biasa tetap seperti semula.
+    val target = item.browseId?.let { PageMenuTarget(it, item.title, item.subtitle, item.thumbnail) }
+    if (target != null) {
+        PageMenuCard(target, Modifier.width(170.dp), onPlay, onClick) { SquareCardBody(item) }
+    } else {
+        Column(Modifier.width(170.dp).clickable(onClick = onClick)) { SquareCardBody(item) }
+    }
+}
+
+@Composable
+private fun SquareCardBody(item: HomeCardItem) {
     val c = AppTheme.colors
-    Column(
-        Modifier
-            .width(170.dp)
-            .clickable(onClick = onClick),
-    ) {
+    Column(Modifier.fillMaxWidth()) {
         Artwork(
             listOf(AppleRed, c.surface),
             Modifier

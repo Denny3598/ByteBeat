@@ -47,6 +47,8 @@ import com.example.applemusicui.data.CategorySection
 import com.example.applemusicui.data.ExploreRepository
 import com.example.applemusicui.data.HomeCardItem
 import com.example.applemusicui.data.Song
+import com.example.applemusicui.ui.components.PageMenuCard
+import com.example.applemusicui.ui.components.PageMenuTarget
 import com.example.applemusicui.ui.theme.AppTheme
 import kotlinx.coroutines.CancellationException
 
@@ -185,7 +187,7 @@ fun CategoryScreen(
                 contentPadding = PaddingValues(bottom = 200.dp),
             ) {
                 items(s.sections) { section ->
-                    CategorySectionBlock(section) { item ->
+                    CategorySectionBlock(section, onPlay) { item ->
                         if (item.videoId != null) {
                             val song = item.toCategorySong() ?: return@CategorySectionBlock
                             onPlay(song, section.items.mapNotNull { it.toCategorySong() })
@@ -200,7 +202,11 @@ fun CategoryScreen(
 }
 
 @Composable
-private fun CategorySectionBlock(section: CategorySection, onClick: (HomeCardItem) -> Unit) {
+private fun CategorySectionBlock(
+    section: CategorySection,
+    onPlay: (Song, List<Song>) -> Unit,
+    onClick: (HomeCardItem) -> Unit,
+) {
     Column(Modifier.padding(bottom = 12.dp)) {
         if (section.title.isNotBlank()) {
             Text(
@@ -218,20 +224,27 @@ private fun CategorySectionBlock(section: CategorySection, onClick: (HomeCardIte
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             items(section.items) { item ->
-                CategoryCard(item) { onClick(item) }
+                CategoryCard(item, onPlay) { onClick(item) }
             }
         }
     }
 }
 
 @Composable
-private fun CategoryCard(item: HomeCardItem, onClick: () -> Unit) {
+private fun CategoryCard(item: HomeCardItem, onPlay: (Song, List<Song>) -> Unit, onClick: () -> Unit) {
+    // Album, playlist, artis, dan podcast bisa ditahan untuk popup. Lagu biasa tetap seperti semula.
+    val target = item.browseId?.let { PageMenuTarget(it, item.title, item.subtitle, item.thumbnail) }
+    if (target != null) {
+        PageMenuCard(target, Modifier.width(150.dp), onPlay, onClick) { CategoryCardBody(item) }
+    } else {
+        Column(Modifier.width(150.dp).clickable(onClick = onClick)) { CategoryCardBody(item) }
+    }
+}
+
+@Composable
+private fun CategoryCardBody(item: HomeCardItem) {
     val c = AppTheme.colors
-    Column(
-        Modifier
-            .width(150.dp)
-            .clickable(onClick = onClick),
-    ) {
+    Column(Modifier.fillMaxWidth()) {
         AsyncImage(
             model = item.thumbnail,
             contentDescription = null,
