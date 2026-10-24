@@ -26,6 +26,9 @@ data class ExploreMood(
     val coverUrl: String?,
 )
 
+/** Satu rak di dalam kategori, misalnya "Hits Indonesia" atau daftar playlist. */
+data class CategorySection(val title: String, val items: List<HomeCardItem>)
+
 private data class MoodButton(
     val title: String,
     val browseId: String,
@@ -168,6 +171,106 @@ object ExploreRepository {
         }
     }
 
+    /** Isi satu kategori: daftar rak (playlist, album, atau lagu) yang bisa dibuka satu per satu. */
+    suspend fun category(browseId: String, params: String?): List<CategorySection> = withContext(Dispatchers.IO) {
+        val root = browse(browseId, params)
+        val contents = root.optJSONObject("contents")
+            ?.optJSONObject("singleColumnBrowseResultsRenderer")
+            ?.optJSONArray("tabs")
+            ?.optJSONObject(0)
+            ?.optJSONObject("tabRenderer")
+            ?.optJSONObject("content")
+            ?.optJSONObject("sectionListRenderer")
+            ?.optJSONArray("contents")
+
+        val sections = mutableListOf<CategorySection>()
+        if (contents != null) {
+            for (i in 0 until contents.length()) {
+                val section = contents.optJSONObject(i)?.let { sectionOf(it) } ?: continue
+                sections += section
+            }
+        }
+        if (sections.isEmpty()) {
+            // Cadangan kalau struktur berubah: kumpulkan semua kartu dalam satu rak tanpa judul.
+            val raw = mutableListOf<JSONObject>()
+            collect(root, "musicTwoRowItemRenderer", raw)
+            val list = raw.mapNotNull { itemOf(it) }.distinctBy { it.videoId ?: it.browseId }
+            if (list.isNotEmpty()) sections += CategorySection("", list)
+        }
+        sections
+    }
+
+    private fun sectionOf(s: JSONObject): CategorySection? {
+        s.optJSONObject("gridRenderer")?.let { grid ->
+            val title = textOf(
+                grid.optJSONObject("header")?.optJSONObject("gridHeaderRenderer")?.optJSONObject("title"),
+            ).orEmpty()
+            val items = grid.optJSONArray("items") ?: return null
+            val list = (0 until items.length()).mapNotNull { j ->
+                items.optJSONObject(j)?.optJSONObject("musicTwoRowItemRenderer")?.let { itemOf(it) }
+            }
+            return if (list.isEmpty()) null else CategorySection(title, list.distinctBy { it.videoId ?: it.browseId })
+        }
+        s.optJSONObject("musicCarouselShelfRenderer")?.let { shelf ->
+            val header = shelf.optJSONObject("header")?.optJSONObject("musicCarouselShelfBasicHeaderRenderer")
+            val title = textOf(header?.optJSONObject("title")).orEmpty()
+            val contents = shelf.optJSONArray("contents") ?: return null
+            val list = (0 until contents.length()).mapNotNull { j ->
+                contents.optJSONObject(j)?.optJSONObject("musicTwoRowItemRenderer")?.let { itemOf(it) }
+            }
+            return if (list.isEmpty()) null else CategorySection(title, list.distinctBy { it.videoId ?: it.browseId })
+        }
+        s.optJSONObject("musicShelfRenderer")?.let { shelf ->
+            val title = textOf(shelf.optJSONObject("title")).orEmpty()
+            val contents = shelf.optJSONArray("contents") ?: return null
+            val list = (0 until contents.length()).mapNotNull { j ->
+                contents.optJSONObject(j)?.optJSONObject("musicResponsiveListItemRenderer")?.let { responsiveOf(it) }
+            }
+            return if (list.isEmpty()) null else CategorySection(title, list.distinctBy { it.videoId ?: it.browseId })
+        }
+        return null
+    }
+
+    /** Kartu dua baris: playlist/album (browseId) atau lagu (videoId). */
+    private fun itemOf(r: JSONObject): HomeCardItem? {
+        val title = textOf(r.optJSONObject("title")) ?: return null
+        val nav = r.optJSONObject("navigationEndpoint")
+        val videoId = nav?.optJSONObject("watchEndpoint")?.optString("videoId")?.takeIf { it.isNotBlank() }
+            ?: r.optJSONObject("thumbnailOverlay")
+                ?.optJSONObject("musicItemThumbnailOverlayRenderer")
+                ?.optJSONObject("content")
+                ?.optJSONObject("musicPlayButtonRenderer")
+                ?.optJSONObject("playNavigationEndpoint")
+                ?.optJSONObject("watchEndpoint")
+                ?.optString("videoId")
+                ?.takeIf { it.isNotBlank() }
+        val browseId = nav?.optJSONObject("browseEndpoint")?.optString("browseId")?.takeIf { it.isNotBlank() }
+        if (videoId == null && browseId == null) return null
+        return HomeCardItem(
+            title = title,
+            subtitle = textOf(r.optJSONObject("subtitle")).orEmpty(),
+            thumbnail = thumbOf(r),
+            videoId = videoId,
+            browseId = browseId,
+        )
+    }
+
+    /** Baris lagu gaya daftar di dalam kategori. */
+    private fun responsiveOf(r: JSONObject): HomeCardItem? {
+        val cols = r.optJSONArray("flexColumns") ?: return null
+        val title = cols.optJSONObject(0)
+            ?.optJSONObject("musicResponsiveListItemFlexColumnRenderer")
+            ?.let { textOf(it.optJSONObject("text")) } ?: return null
+        val subtitle = cols.optJSONObject(1)
+            ?.optJSONObject("musicResponsiveListItemFlexColumnRenderer")
+            ?.let { textOf(it.optJSONObject("text")) }.orEmpty()
+        val videoId = r.optJSONObject("playlistItemData")?.optString("videoId")?.takeIf { it.isNotBlank() }
+        val browseId = r.optJSONObject("navigationEndpoint")
+            ?.optJSONObject("browseEndpoint")?.optString("browseId")?.takeIf { it.isNotBlank() }
+        if (videoId == null && browseId == null) return null
+        return HomeCardItem(title, subtitle, thumbOf(r), videoId, browseId)
+    }
+
     private val coverLimit = Semaphore(3)
 
     private fun browse(browseId: String, params: String?): JSONObject {
@@ -224,7 +327,12 @@ object ExploreRepository {
         val arr = renderer.optJSONObject("thumbnailRenderer")
             ?.optJSONObject("musicThumbnailRenderer")
             ?.optJSONObject("thumbnail")
-            ?.optJSONArray("thumbnails") ?: return null
+            ?.optJSONArray("thumbnails")
+            ?: renderer.optJSONObject("thumbnail")
+                ?.optJSONObject("musicThumbnailRenderer")
+                ?.optJSONObject("thumbnail")
+                ?.optJSONArray("thumbnails")
+            ?: return null
         if (arr.length() == 0) return null
         val url = arr.getJSONObject(arr.length() - 1).optString("url").takeIf { it.isNotBlank() }
             ?: return null
