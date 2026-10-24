@@ -1,25 +1,26 @@
 package com.example.applemusicui.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,9 +31,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -44,9 +42,9 @@ import com.example.applemusicui.data.LibraryRepository
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.components.Artwork
 import com.example.applemusicui.ui.components.ScreenHeader
-import com.example.applemusicui.ui.components.SectionHeader
 import com.example.applemusicui.ui.theme.AppTheme
 import com.example.applemusicui.ui.theme.AppleRed
+import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.launch
 
 @Composable
@@ -112,9 +110,9 @@ fun ListenNowScreen(current: Song, onPlay: (Song, List<Song>) -> Unit) {
                 list.forEachIndexed { index, shelf ->
                     item(key = "shelf-$index-${shelf.title}") {
                         if (index == 0) {
-                            HeroShelf(shelf) { item -> open(item, shelf) }
+                            RecentsShelf(shelf, current) { item -> open(item, shelf) }
                         } else {
-                            ShelfRow(shelf) { item -> open(item, shelf) }
+                            SquareShelf(shelf) { item -> open(item, shelf) }
                         }
                     }
                 }
@@ -123,19 +121,44 @@ fun ListenNowScreen(current: Song, onPlay: (Song, List<Song>) -> Unit) {
     }
 }
 
-/** Rak pertama: kartu besar dengan judul di atas gradasi gelap, seperti Listen Now di BitChord. */
 @Composable
-private fun HeroShelf(shelf: HomeShelf, onClick: (HomeCardItem) -> Unit) {
-    Column(Modifier.padding(bottom = 26.dp)) {
-        SectionHeader(title = shelf.title, action = null)
-        BoxWithConstraints {
-            val cardWidth = maxWidth * 0.78f
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                items(shelf.items) { item ->
-                    HeroCard(item, Modifier.width(cardWidth)) { onClick(item) }
+private fun ShelfTitle(title: String, subtitle: String) {
+    val c = AppTheme.colors
+    Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 26.dp, bottom = 12.dp)) {
+        Text(
+            title,
+            color = c.text,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (subtitle.isNotBlank()) {
+            Text(
+                subtitle.uppercase(),
+                color = c.textSecondary,
+                fontSize = 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** Rak pertama: daftar baris, 4 lagu per halaman, bisa digeser ke samping. */
+@Composable
+private fun RecentsShelf(shelf: HomeShelf, current: Song, onClick: (HomeCardItem) -> Unit) {
+    Column(Modifier.padding(bottom = 8.dp)) {
+        ShelfTitle(shelf.title, shelf.subtitle)
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            items(shelf.items.chunked(4)) { page ->
+                Column(Modifier.fillParentMaxWidth(0.9f)) {
+                    page.forEach { item ->
+                        ListRow(item, highlighted = isCurrent(item, current)) { onClick(item) }
+                    }
                 }
             }
         }
@@ -143,57 +166,55 @@ private fun HeroShelf(shelf: HomeShelf, onClick: (HomeCardItem) -> Unit) {
 }
 
 @Composable
-private fun HeroCard(item: HomeCardItem, modifier: Modifier, onClick: () -> Unit) {
+private fun ListRow(item: HomeCardItem, highlighted: Boolean, onClick: () -> Unit) {
     val c = AppTheme.colors
-    Box(
-        modifier
-            .aspectRatio(0.82f)
-            .clip(RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick),
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Artwork(
             listOf(AppleRed, c.surface),
-            Modifier.fillMaxSize(),
-            corner = 0.dp,
+            Modifier.size(56.dp),
+            corner = 6.dp,
             imageUrl = item.thumbnail,
         )
-        Column(
-            Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f)),
-                    ),
-                )
-                .padding(start = 16.dp, end = 16.dp, top = 34.dp, bottom = 14.dp),
-        ) {
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
             Text(
                 item.title,
-                color = Color.White,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
+                color = if (highlighted) AppleRed else c.text,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             if (item.subtitle.isNotBlank()) {
                 Text(
                     item.subtitle,
-                    color = Color.White.copy(alpha = 0.72f),
+                    color = c.textSecondary,
                     fontSize = 15.sp,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
+        Icon(
+            Icons.Filled.MoreVert,
+            contentDescription = "Opsi",
+            tint = c.textSecondary,
+            modifier = Modifier.size(22.dp),
+        )
     }
 }
 
-/** Rak biasa: judul di atas, lalu deretan kartu persegi yang bisa digeser. */
+/** Rak biasa: deretan kartu persegi besar dengan judul dan subjudul. */
 @Composable
-private fun ShelfRow(shelf: HomeShelf, onClick: (HomeCardItem) -> Unit) {
-    Column(Modifier.padding(bottom = 26.dp)) {
-        SectionHeader(title = shelf.title, action = null)
+private fun SquareShelf(shelf: HomeShelf, onClick: (HomeCardItem) -> Unit) {
+    Column(Modifier.padding(bottom = 16.dp)) {
+        ShelfTitle(shelf.title, shelf.subtitle)
         LazyRow(
             contentPadding = PaddingValues(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -210,36 +231,41 @@ private fun SquareCard(item: HomeCardItem, onClick: () -> Unit) {
     val c = AppTheme.colors
     Column(
         Modifier
-            .width(150.dp)
+            .width(170.dp)
             .clickable(onClick = onClick),
     ) {
         Artwork(
             listOf(AppleRed, c.surface),
             Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f),
-            corner = 12.dp,
+                .height(170.dp),
+            corner = 14.dp,
             imageUrl = item.thumbnail,
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
         Text(
             item.title,
             color = c.text,
-            fontSize = 15.sp,
+            fontSize = 16.sp,
             fontWeight = FontWeight.Medium,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         if (item.subtitle.isNotBlank()) {
             Text(
                 item.subtitle,
                 color = c.textSecondary,
-                fontSize = 13.sp,
+                fontSize = 14.sp,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
     }
+}
+
+private fun isCurrent(item: HomeCardItem, current: Song): Boolean {
+    val vid = item.videoId ?: return false
+    return current.url.contains("v=$vid")
 }
 
 private fun HomeCardItem.toSong(): Song? {
