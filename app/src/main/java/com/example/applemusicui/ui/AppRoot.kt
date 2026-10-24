@@ -105,7 +105,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
                 AppTab.Home -> ListenNowScreen(highlight, play, openPage)
                 AppTab.Explore -> ExploreScreen()
                 AppTab.Library -> LibraryScreen(onPlay = play, onOpenPage = openPage)
-                AppTab.Search -> SearchScreen(highlight, play)
+                AppTab.Search -> SearchScreen(highlight, play, openPage)
             }
 
             // Halaman detail menutupi konten tab, tapi mini player dan tab bar tetap di atasnya.
