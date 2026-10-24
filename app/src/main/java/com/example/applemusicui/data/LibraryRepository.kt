@@ -35,28 +35,18 @@ object LibraryRepository {
         .build()
     private val jsonType = "application/json; charset=utf-8".toMediaType()
 
-    /** Playlist yang disimpan di akun. */
-    suspend fun playlists(): List<LibraryItem> = withContext(Dispatchers.IO) {
-        val root = browse("FEmusic_liked_playlists")
-        val found = mutableListOf<JSONObject>()
-        collect(root, "musicTwoRowItemRenderer", found)
-        found.mapNotNull { r ->
-            val title = textOf(r.optJSONObject("title")) ?: return@mapNotNull null
-            val browseId = r.optJSONObject("navigationEndpoint")
-                ?.optJSONObject("browseEndpoint")
-                ?.optString("browseId")
-                ?.takeIf { it.isNotBlank() }
-                ?: return@mapNotNull null
-            LibraryItem(
-                title = title,
-                subtitle = textOf(r.optJSONObject("subtitle")).orEmpty(),
-                thumbnail = thumbOf(r),
-                browseId = browseId,
-            )
-        }
+    /** Isi sebuah halaman pustaka: playlist, album, artis, atau langganan (tergantung browseId). */
+    suspend fun library(browseId: String): List<LibraryItem> = withContext(Dispatchers.IO) {
+        val root = browse(browseId)
+        val two = mutableListOf<JSONObject>()
+        collect(root, "musicTwoRowItemRenderer", two)
+        val responsive = mutableListOf<JSONObject>()
+        collect(root, "musicResponsiveListItemRenderer", responsive)
+        (two.mapNotNull { twoRowToItem(it) } + responsive.mapNotNull { responsiveToItem(it) })
+            .distinctBy { it.browseId }
     }
 
-    /** Lagu di dalam playlist (atau di "FEmusic_liked_videos"). */
+    /** Lagu di dalam playlist, album, atau "FEmusic_liked_videos". */
     suspend fun tracks(browseId: String): List<Song> = withContext(Dispatchers.IO) {
         val root = browse(browseId)
         val found = mutableListOf<JSONObject>()
@@ -77,12 +67,38 @@ object LibraryRepository {
         }
     }
 
+    private fun twoRowToItem(r: JSONObject): LibraryItem? {
+        val title = textOf(r.optJSONObject("title")) ?: return null
+        val browseId = browseIdOf(r) ?: return null
+        return LibraryItem(
+            title = title,
+            subtitle = textOf(r.optJSONObject("subtitle")).orEmpty(),
+            thumbnail = thumbOf(r),
+            browseId = browseId,
+        )
+    }
+
+    private fun responsiveToItem(r: JSONObject): LibraryItem? {
+        val title = flexText(r, 0, firstOnly = false) ?: return null
+        val browseId = browseIdOf(r) ?: return null
+        return LibraryItem(
+            title = title,
+            subtitle = flexText(r, 1, firstOnly = false).orEmpty(),
+            thumbnail = thumbOf(r),
+            browseId = browseId,
+        )
+    }
+
+    private fun browseIdOf(r: JSONObject): String? = r.optJSONObject("navigationEndpoint")
+        ?.optJSONObject("browseEndpoint")
+        ?.optString("browseId")
+        ?.takeIf { it.isNotBlank() }
+
     private fun browse(browseId: String): JSONObject {
         val cookie = CookieManager.getInstance().getCookie(YT_ORIGIN)
             ?: error("Belum login")
         val sapisid = sapisid(cookie) ?: error("Cookie login tidak lengkap")
 
-        // SAPISIDHASH: SHA-1 dari "timestamp sapisid origin"
         val ts = System.currentTimeMillis() / 1000
         val hash = MessageDigest.getInstance("SHA-1")
             .digest("$ts $sapisid $YT_ORIGIN".toByteArray())
@@ -156,7 +172,9 @@ object LibraryRepository {
         return chosen.joinToString("").takeIf { it.isNotBlank() }
     }
 
-    private fun thumbOf(r: JSONObject): String? {
+    private fun thumbOf(r: JSONObject): String? = hdThumb(rawThumb(r))
+
+    private fun rawThumb(r: JSONObject): String? {
         val arr = r.optJSONObject("thumbnailRenderer")
             ?.optJSONObject("musicThumbnailRenderer")
             ?.optJSONObject("thumbnail")
