@@ -28,14 +28,20 @@ import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.example.applemusicui.data.AccountProfile
+import com.example.applemusicui.data.AccountRepository
 import com.example.applemusicui.ui.theme.AppTheme
 
 /** Ruangan khusus akun: status login, masuk, keluar, dan apa saja yang ikut tersinkron. */
@@ -47,6 +53,10 @@ fun AccountScreen(
     onLogout: () -> Unit,
 ) {
     val c = AppTheme.colors
+    // Profil (nama dan foto) diambil dari YouTube Music saat sudah login.
+    val profile by produceState<AccountProfile?>(null, loggedIn) {
+        value = if (loggedIn) runCatching { AccountRepository.profile() }.getOrNull() else null
+    }
 
     Column(
         Modifier
@@ -92,15 +102,27 @@ fun AccountScreen(
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(
-                Icons.Filled.AccountCircle,
-                contentDescription = null,
-                tint = c.text,
-                modifier = Modifier.size(64.dp),
-            )
+            val photo = profile?.photo
+            if (photo != null) {
+                AsyncImage(
+                    model = photo,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(96.dp)
+                        .clip(CircleShape),
+                )
+            } else {
+                Icon(
+                    Icons.Filled.AccountCircle,
+                    contentDescription = null,
+                    tint = c.text,
+                    modifier = Modifier.size(64.dp),
+                )
+            }
             Spacer(Modifier.height(12.dp))
             Text(
-                if (loggedIn) "Terhubung ke YouTube Music" else "Belum masuk",
+                if (loggedIn) profile?.name?.takeIf { it.isNotBlank() } ?: "Terhubung ke YouTube Music" else "Belum masuk",
                 color = c.text,
                 fontSize = 19.sp,
                 fontWeight = FontWeight.SemiBold,
