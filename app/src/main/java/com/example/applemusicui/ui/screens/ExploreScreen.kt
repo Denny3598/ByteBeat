@@ -1,6 +1,7 @@
 package com.example.applemusicui.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,11 +15,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Podcasts
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -126,6 +132,10 @@ fun ExploreScreen(onOpenCategory: (String, String?, String) -> Unit = { _, _, _ 
                     Modifier.weight(1f),
                     contentPadding = PaddingValues(bottom = 200.dp),
                 ) {
+                    // Pintu masuk podcast: rak podcast dari YouTube Music dibuka lewat halaman kategori.
+                    item(key = "podcast") {
+                        PodcastCard { onOpenCategory("FEmusic_podcasts", null, "Podcast") }
+                    }
                     items(
                         rows,
                         key = { row -> row.first().let { "${it.browseId}|${it.params.orEmpty()}" } },
@@ -146,6 +156,36 @@ fun ExploreScreen(onOpenCategory: (String, String?, String) -> Unit = { _, _, _ 
                     }
                 }
             }
+        }
+    }
+}
+
+/** Kartu transparan di atas daftar kategori: membuka podcast dari YouTube Music. */
+@Composable
+private fun PodcastCard(onClick: () -> Unit) {
+    val c = AppTheme.colors
+    val shape = RoundedCornerShape(18.dp)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 20.dp, bottom = 12.dp)
+            .clip(shape)
+            .background(c.glass)
+            .border(1.dp, c.glassBorder, shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Filled.Podcasts,
+            contentDescription = null,
+            tint = c.text,
+            modifier = Modifier.size(28.dp),
+        )
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Podcast", color = c.text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("Dari YouTube Music", color = c.textSecondary, fontSize = 14.sp)
         }
     }
 }

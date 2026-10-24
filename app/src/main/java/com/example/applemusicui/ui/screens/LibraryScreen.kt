@@ -65,12 +65,13 @@ import kotlinx.coroutines.launch
 
 private const val LIKED_ID = "FEmusic_liked_videos"
 
-/** Empat tab pustaka. Browse ID-nya adalah halaman library milik YouTube Music. */
+/** Lima tab pustaka. Browse ID-nya adalah halaman library milik YouTube Music. */
 private enum class LibrarySection(val label: String, val browseId: String) {
     Playlist("Playlist", "FEmusic_liked_playlists"),
     Album("Album", "FEmusic_liked_albums"),
     Artist("Artis", "FEmusic_library_corpus_track_artists"),
     Subscription("Langganan", "FEmusic_library_corpus_artists"),
+    Podcast("Podcast", "FEmusic_library_non_music_audio_list"),
 }
 
 private suspend fun loadSections(): Map<LibrarySection, List<LibraryItem>> = coroutineScope {
