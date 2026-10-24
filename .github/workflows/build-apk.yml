@@ -46,8 +46,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          echo "$GITHUB_SHA" > build-sha.txt
           gh release delete latest --cleanup-tag --yes || true
-          gh release create latest ByteBeat.apk --title "ByteBeat (latest)" --notes "Build otomatis" --target "$GITHUB_SHA"
+          gh release create latest ByteBeat.apk build-sha.txt --title "ByteBeat (latest)" --notes "Build otomatis" --target "$GITHUB_SHA"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
