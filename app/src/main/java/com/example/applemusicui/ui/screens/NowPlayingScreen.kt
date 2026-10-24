@@ -49,17 +49,20 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -134,6 +137,7 @@ fun NowPlayingScreen(
         .aspectRatio(1f)
         .onGloballyPositioned { coverRect = it.boundsInRoot() }
         .graphicsLayer {
+            compositingStrategy = CompositingStrategy.Offscreen
             val t = coverRect
             val s = startRect
             if (t != null && s != null) {
@@ -193,8 +197,20 @@ fun NowPlayingScreen(
         )
 
         Column(Modifier.fillMaxSize()) {
-            // Cover edge-to-edge sampai atas layar, di belakang status bar.
-            Box(coverModifier) {
+            // Cover edge-to-edge sampai atas layar. Bagian bawahnya memudar ke latar blur,
+            // jadi tidak ada batas yang terlihat.
+            Box(
+                coverModifier.drawWithContent {
+                    drawContent()
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            0.5f to Color.Black,
+                            1f to Color.Transparent,
+                        ),
+                        blendMode = BlendMode.DstIn,
+                    )
+                },
+            ) {
                 Artwork(
                     colors = song.art,
                     modifier = Modifier.fillMaxSize(),
@@ -487,13 +503,4 @@ private fun CircleIcon(icon: ImageVector, description: String) {
 @Composable
 private fun BottomAction(icon: ImageVector, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(icon, contentDescription = label, tint = Fg, modifier = Modifier.size(26.dp))
-        Spacer(Modifier.height(4.dp))
-        Text(label, color = FgDim, fontSize = 11.sp)
-    }
-}
-
-private fun formatTime(ms: Long): String {
-    val total = ms.coerceAtLeast(0L) / 1000
-    return "%d:%02d".format(total / 60, total % 60)
-}
+        Icon(i
