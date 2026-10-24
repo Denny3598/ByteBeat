@@ -88,6 +88,7 @@ dependencies {
 
     // Cover art
     implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("androidx.palette:palette:1.0.0")
 
     // Pemutaran audio
     implementation("androidx.media3:media3-exoplayer:1.4.1")
