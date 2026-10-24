@@ -1,5 +1,6 @@
 package com.example.applemusicui.data
 
+import android.webkit.CookieManager
 import androidx.compose.ui.graphics.Color
 import com.example.applemusicui.ui.theme.AppleRed
 import kotlinx.coroutines.Dispatchers
@@ -10,6 +11,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 data class AlbumPage(
@@ -32,6 +34,7 @@ data class ArtistPage(
 /** Halaman album, playlist, dan artis dari YouTube Music. Tidak perlu login. */
 object DetailRepository {
     private const val API = "https://music.youtube.com/youtubei/v1/browse?prettyPrint=false"
+    private const val YT_ORIGIN = "https://music.youtube.com"
     private const val CLIENT_VERSION = "1.20241009.01.00"
     private const val USER_AGENT =
         "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36"
@@ -120,20 +123,41 @@ object DetailRepository {
             .put("context", JSONObject().put("client", client))
             .put("browseId", browseId)
 
-        val req = Request.Builder()
+        // Kalau sudah login, kirim cookie + SAPISIDHASH seperti beranda. Tanpa ini YouTube membalas HTTP 401.
+        val cookie = CookieManager.getInstance().getCookie(YT_ORIGIN)
+        val sapisid = cookie?.let { sapisidOf(it) }
+
+        val builder = Request.Builder()
             .url(API)
             .header("User-Agent", USER_AGENT)
-            .header("Origin", "https://music.youtube.com")
-            .header("Referer", "https://music.youtube.com/")
+            .header("Origin", YT_ORIGIN)
+            .header("Referer", "$YT_ORIGIN/")
             .header("X-YouTube-Client-Name", "67")
             .header("X-YouTube-Client-Version", CLIENT_VERSION)
-            .post(body.toString().toRequestBody(jsonType))
-            .build()
+        if (cookie != null && sapisid != null) {
+            val ts = System.currentTimeMillis() / 1000
+            val hash = MessageDigest.getInstance("SHA-1")
+                .digest("$ts $sapisid $YT_ORIGIN".toByteArray())
+                .joinToString("") { "%02x".format(it) }
+            builder
+                .header("Authorization", "SAPISIDHASH ${ts}_$hash")
+                .header("Cookie", cookie)
+                .header("X-Goog-AuthUser", "0")
+        }
+        val req = builder.post(body.toString().toRequestBody(jsonType)).build()
 
         http.newCall(req).execute().use { res ->
             if (!res.isSuccessful) error("HTTP ${res.code}")
             return JSONObject(res.body?.string().orEmpty())
         }
+    }
+
+    private fun sapisidOf(cookie: String): String? {
+        for (part in cookie.split(";")) {
+            val kv = part.trim().split("=", limit = 2)
+            if (kv.size == 2 && (kv[0] == "SAPISID" || kv[0] == "__Secure-3PAPISID")) return kv[1]
+        }
+        return null
     }
 
     /** Nama dan browse id artis dari sebuah teks yang punya tautan artis (misalnya subtitle album). */

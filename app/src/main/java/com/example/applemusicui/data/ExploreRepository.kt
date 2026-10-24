@@ -214,9 +214,9 @@ object ExploreRepository {
         if (arr.length() == 0) return null
         val url = arr.getJSONObject(arr.length() - 1).optString("url").takeIf { it.isNotBlank() }
             ?: return null
-        // Cover HD untuk kartu Jelajahi.
+        // Ukuran sedang saja: puluhan cover 1200px sekaligus menghabiskan memori (OutOfMemoryError).
         return url
-            .replace(Regex("=w\\d+-h\\d+"), "=w1200-h1200")
-            .replace(Regex("=s\\d+"), "=s1200")
+            .replace(Regex("=w\\d+-h\\d+"), "=w544-h544")
+            .replace(Regex("=s\\d+"), "=s544")
     }
 }
