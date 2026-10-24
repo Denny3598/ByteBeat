@@ -63,10 +63,8 @@ import com.example.applemusicui.ui.theme.ThemeMode
 @Composable
 fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
     val context = LocalContext.current
-    val controller = remember { PlaybackController(context.applicationContext) }
-    DisposableEffect(controller) {
-        onDispose { controller.release() }
-    }
+    // Satu controller untuk seluruh proses; tidak dilepas saat UI ditutup, supaya antrean tetap jalan.
+    val controller = remember { PlaybackController.get(context.applicationContext) }
 
     var tab by rememberSaveable { mutableStateOf(AppTab.Home) }
     var showNowPlaying by rememberSaveable { mutableStateOf(false) }
