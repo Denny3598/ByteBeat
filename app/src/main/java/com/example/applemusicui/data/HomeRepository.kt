@@ -44,6 +44,12 @@ data class HomeShelf(
     val subtitle: String = "",
 )
 
+/** Satu halaman beranda, beserta token untuk memuat rak berikutnya (null kalau sudah habis). */
+data class HomePage(
+    val shelves: List<HomeShelf>,
+    val continuation: String?,
+)
+
 /** Beranda YouTube Music. Memakai login bila ada, supaya rekomendasinya milik akun. */
 object HomeRepository {
     private const val API = "https://music.youtube.com/youtubei/v1/browse?prettyPrint=false"
@@ -58,43 +64,71 @@ object HomeRepository {
         .build()
     private val jsonType = "application/json; charset=utf-8".toMediaType()
 
-    /**
-     * Membaca setiap section di beranda, seperti parser BitChord:
-     * rak kartu (musicCarouselShelfRenderer) dan rak daftar (musicShelfRenderer, misalnya "Recents").
-     */
-    suspend fun shelves(): List<HomeShelf> = withContext(Dispatchers.IO) {
-        val root = browse("FEmusic_home")
-        val sections = root.optJSONObject("contents")
+    /** Halaman pertama beranda: rak-rak pertama plus token untuk halaman berikutnya. */
+    suspend fun firstPage(): HomePage = withContext(Dispatchers.IO) {
+        val root = browse("FEmusic_home", null)
+        val list = root.optJSONObject("contents")
             ?.optJSONObject("singleColumnBrowseResultsRenderer")
             ?.optJSONArray("tabs")
             ?.optJSONObject(0)
             ?.optJSONObject("tabRenderer")
             ?.optJSONObject("content")
             ?.optJSONObject("sectionListRenderer")
-            ?.optJSONArray("contents")
 
-        val result = mutableListOf<HomeShelf>()
-        if (sections != null) {
-            for (i in 0 until sections.length()) {
-                val section = sections.optJSONObject(i) ?: continue
-                val shelf = section.optJSONObject("musicCarouselShelfRenderer")?.let { carouselShelf(it) }
-                    ?: section.optJSONObject("musicShelfRenderer")?.let { plainShelf(it) }
-                if (shelf != null) result += shelf
-            }
-        }
+        val parsed = parseSections(list?.optJSONArray("contents"))
+        var shelves = parsed.first
+        var token = parsed.second
+            ?: list?.optJSONArray("continuations")?.optJSONObject(0)
+                ?.optJSONObject("nextContinuationData")?.optString("continuation")?.takeIf { it.isNotBlank() }
+
         // Kalau struktur section berubah, cadangannya: cari semua rak kartu di mana pun dalam JSON.
-        if (result.isEmpty()) {
+        if (shelves.isEmpty()) {
             val carousels = mutableListOf<JSONObject>()
             collect(root, "musicCarouselShelfRenderer", carousels)
-            carousels.mapNotNullTo(result) { carouselShelf(it) }
+            shelves = carousels.mapNotNull { carouselShelf(it) }
         }
-        result
+        HomePage(shelves, token)
     }
 
-    /** Rak kartu: judul dan subjudul besar, lalu item berupa kartu (album, playlist, atau lagu). */
+    /** Memuat rak berikutnya dengan token dari [firstPage] atau halaman sebelumnya. */
+    suspend fun nextPage(token: String): HomePage = withContext(Dispatchers.IO) {
+        val root = browse(null, token)
+        val section = root.optJSONObject("continuationContents")
+            ?.optJSONObject("sectionListContinuation")
+        val parsed = parseSections(section?.optJSONArray("contents"))
+        val next = parsed.second
+            ?: section?.optJSONArray("continuations")?.optJSONObject(0)
+                ?.optJSONObject("nextContinuationData")?.optString("continuation")?.takeIf { it.isNotBlank() }
+        HomePage(parsed.first, next)
+    }
+
+    /** Membaca daftar section: rak kartu, rak banner, rak daftar, dan token lanjutan kalau ada. */
+    private fun parseSections(sections: JSONArray?): Pair<List<HomeShelf>, String?> {
+        val shelves = mutableListOf<HomeShelf>()
+        var token: String? = null
+        if (sections == null) return shelves to null
+        for (i in 0 until sections.length()) {
+            val section = sections.optJSONObject(i) ?: continue
+            val shelf = section.optJSONObject("musicCarouselShelfRenderer")?.let { carouselShelf(it) }
+                ?: section.optJSONObject("musicImmersiveCarouselShelfRenderer")?.let { carouselShelf(it) }
+                ?: section.optJSONObject("musicShelfRenderer")?.let { plainShelf(it) }
+            if (shelf != null) shelves += shelf
+
+            val cont = section.optJSONObject("continuationItemRenderer")
+                ?.optJSONObject("continuationEndpoint")
+                ?.optJSONObject("continuationCommand")
+                ?.optString("token")
+                ?.takeIf { it.isNotBlank() }
+            if (cont != null) token = cont
+        }
+        return shelves to token
+    }
+
+    /** Rak kartu (biasa atau banner): judul dan subjudul besar, lalu item berupa kartu. */
     private fun carouselShelf(carousel: JSONObject): HomeShelf? {
-        val header = carousel.optJSONObject("header")
-            ?.optJSONObject("musicCarouselShelfBasicHeaderRenderer")
+        val headerRoot = carousel.optJSONObject("header")
+        val header = headerRoot?.optJSONObject("musicCarouselShelfBasicHeaderRenderer")
+            ?: headerRoot?.optJSONObject("musicImmersiveCarouselShelfBasicHeaderRenderer")
         val title = textOf(header?.optJSONObject("title")) ?: return null
         val subtitle = textOf(header?.optJSONObject("strapline")).orEmpty()
         val contents = carousel.optJSONArray("contents") ?: return null
@@ -176,7 +210,8 @@ object HomeRepository {
         return textOf(text)
     }
 
-    private fun browse(browseId: String): JSONObject {
+    /** Memanggil browse. Isi [browseId] untuk halaman awal, atau [continuation] untuk halaman berikutnya. */
+    private fun browse(browseId: String?, continuation: String?): JSONObject {
         val cookie = CookieManager.getInstance().getCookie(YT_ORIGIN)
         val sapisid = cookie?.let { sapisid(it) }
 
@@ -187,7 +222,8 @@ object HomeRepository {
             .put("gl", "ID")
         val body = JSONObject()
             .put("context", JSONObject().put("client", client))
-            .put("browseId", browseId)
+        if (browseId != null) body.put("browseId", browseId)
+        if (continuation != null) body.put("continuation", continuation)
 
         val builder = Request.Builder()
             .url(API)
