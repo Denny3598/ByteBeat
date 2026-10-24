@@ -23,7 +23,14 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -225,12 +232,33 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
                 }
             }
 
-            if (showNowPlaying && current != null) {
-                NowPlayingScreen(
-                    song = current,
-                    controller = controller,
-                    onClose = { showNowPlaying = false },
-                )
+            // Animasi buka dan tutup: layar tumbuh dari mini player di bawah, lalu mengecil lagi saat ditutup.
+            val npProgress by animateFloatAsState(
+                targetValue = if (showNowPlaying) 1f else 0f,
+                animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
+                label = "nowPlaying",
+            )
+            if ((showNowPlaying || npProgress > 0f) && current != null) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            val inv = 1f - npProgress
+                            transformOrigin = TransformOrigin(0.5f, 1f)
+                            scaleX = 0.9f + 0.1f * npProgress
+                            scaleY = 0.9f + 0.1f * npProgress
+                            translationY = inv * size.height * 0.3f
+                            alpha = npProgress
+                            shape = RoundedCornerShape((inv * 28f).dp)
+                            clip = npProgress < 1f
+                        },
+                ) {
+                    NowPlayingScreen(
+                        song = current,
+                        controller = controller,
+                        onClose = { showNowPlaying = false },
+                    )
+                }
             }
 
             if (showSettings) {
