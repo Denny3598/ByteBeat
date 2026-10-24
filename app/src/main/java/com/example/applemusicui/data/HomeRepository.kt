@@ -12,6 +12,14 @@ import org.json.JSONObject
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
+/** Mengganti ukuran thumbnail YouTube dengan versi resolusi tinggi supaya tajam di layar HP. */
+fun hdThumb(url: String?): String? {
+    if (url.isNullOrBlank()) return null
+    return url
+        .replace(Regex("=w\\d+-h\\d+"), "=w1200-h1200")
+        .replace(Regex("=s\\d+"), "=s1200")
+}
+
 /** Satu kartu di beranda: lagu (punya videoId) atau album/playlist (punya browseId). */
 data class HomeCardItem(
     val title: String,
@@ -21,10 +29,11 @@ data class HomeCardItem(
     val browseId: String?,
 )
 
-/** Satu rak beranda, misalnya "Dengarkan lagi". */
+/** Satu rak beranda, misalnya "Dengarkan lagi" beserta subjudulnya. */
 data class HomeShelf(
     val title: String,
     val items: List<HomeCardItem>,
+    val subtitle: String = "",
 )
 
 /** Beranda YouTube Music. Memakai login bila ada, supaya rekomendasinya milik akun. */
@@ -46,16 +55,20 @@ object HomeRepository {
         val carousels = mutableListOf<JSONObject>()
         collect(root, "musicCarouselShelfRenderer", carousels)
         carousels.mapNotNull { shelf ->
-            val title = textOf(
-                shelf.optJSONObject("header")
-                    ?.optJSONObject("musicCarouselShelfBasicHeaderRenderer")
-                    ?.optJSONObject("title"),
-            ) ?: return@mapNotNull null
-            val raw = mutableListOf<JSONObject>()
-            collect(shelf.optJSONArray("contents") ?: JSONArray(), "musicTwoRowItemRenderer", raw)
-            val items = raw.mapNotNull { parseItem(it) }
+            val header = shelf.optJSONObject("header")
+                ?.optJSONObject("musicCarouselShelfBasicHeaderRenderer")
+            val title = textOf(header?.optJSONObject("title")) ?: return@mapNotNull null
+            val subtitle = textOf(header?.optJSONObject("strapline")).orEmpty()
+
+            val contents = shelf.optJSONArray("contents") ?: JSONArray()
+            val two = mutableListOf<JSONObject>()
+            collect(contents, "musicTwoRowItemRenderer", two)
+            val responsive = mutableListOf<JSONObject>()
+            collect(contents, "musicResponsiveListItemRenderer", responsive)
+
+            val items = (two.mapNotNull { parseItem(it) } + responsive.mapNotNull { parseResponsive(it) })
                 .distinctBy { it.videoId ?: it.browseId }
-            if (items.isEmpty()) null else HomeShelf(title, items)
+            if (items.isEmpty()) null else HomeShelf(title, items, subtitle)
         }
     }
 
@@ -85,6 +98,35 @@ object HomeRepository {
             videoId = videoId,
             browseId = browseId,
         )
+    }
+
+    /** Baris lagu gaya daftar (dipakai rak "Dengarkan lagi"). */
+    private fun parseResponsive(r: JSONObject): HomeCardItem? {
+        val title = flexText(r, 0) ?: return null
+        val videoId = r.optJSONObject("playlistItemData")
+            ?.optString("videoId")
+            ?.takeIf { it.isNotBlank() }
+        val browseId = r.optJSONObject("navigationEndpoint")
+            ?.optJSONObject("browseEndpoint")
+            ?.optString("browseId")
+            ?.takeIf { it.isNotBlank() }
+        if (videoId == null && browseId == null) return null
+        return HomeCardItem(
+            title = title,
+            subtitle = flexText(r, 1).orEmpty(),
+            thumbnail = thumbOf(r),
+            videoId = videoId,
+            browseId = browseId,
+        )
+    }
+
+    private fun flexText(r: JSONObject, index: Int): String? {
+        val cols = r.optJSONArray("flexColumns") ?: return null
+        if (index >= cols.length()) return null
+        val text = cols.getJSONObject(index)
+            .optJSONObject("musicResponsiveListItemFlexColumnRenderer")
+            ?.optJSONObject("text") ?: return null
+        return textOf(text)
     }
 
     private fun browse(browseId: String): JSONObject {
@@ -156,7 +198,9 @@ object HomeRepository {
             .takeIf { it.isNotBlank() }
     }
 
-    private fun thumbOf(r: JSONObject): String? {
+    private fun thumbOf(r: JSONObject): String? = hdThumb(rawThumb(r))
+
+    private fun rawThumb(r: JSONObject): String? {
         val arr = r.optJSONObject("thumbnailRenderer")
             ?.optJSONObject("musicThumbnailRenderer")
             ?.optJSONObject("thumbnail")
