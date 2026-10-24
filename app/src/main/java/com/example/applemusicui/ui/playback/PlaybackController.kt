@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaController
@@ -20,13 +21,27 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-/** Pemutar untuk UI. Player aslinya dipegang [SharedPlayer] dan service latar belakang. */
-class PlaybackController(context: Context) {
+/**
+ * Pemutar untuk UI dan antrean. Hanya ada satu per proses, dan tidak dilepas saat layar ditutup,
+ * supaya lagu berikutnya tetap diputar walau aplikasi tidak sedang terbuka.
+ */
+class PlaybackController private constructor(context: Context) {
+
+    companion object {
+        private const val MAX_RETRY = 2
+
+        @Volatile
+        private var instance: PlaybackController? = null
+
+        fun get(context: Context): PlaybackController =
+            instance ?: synchronized(this) {
+                instance ?: PlaybackController(context.applicationContext).also { instance = it }
+            }
+    }
 
     private val appContext = context.applicationContext
     private val player: ExoPlayer = SharedPlayer.get(appContext)
@@ -46,6 +61,7 @@ class PlaybackController(context: Context) {
 
     private var queue: List<Song> = emptyList()
     private var loadJob: Job? = null
+    private var retries = 0
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     private val listener = object : Player.Listener {
@@ -55,9 +71,27 @@ class PlaybackController(context: Context) {
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_READY) {
+                retries = 0
                 durationMs = player.duration.coerceAtLeast(0L)
             }
-            if (playbackState == Player.STATE_ENDED) next()
+            if (playbackState == Player.STATE_ENDED) {
+                // Lagu terakhir di antrean berhenti, seperti Apple Music.
+                val index = queue.indexOf(current)
+                if (index >= 0 && index < queue.lastIndex) next() else isPlaying = false
+            }
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            val song = current ?: return
+            if (retries < MAX_RETRY) {
+                // Stream bisa kedaluwarsa atau koneksi putus: ambil ulang dan lanjut dari posisi terakhir.
+                retries++
+                start(song, queue, positionMs)
+            } else {
+                isPlaying = false
+                loading = false
+                errorText = "Lagu terhenti. Ketuk putar untuk mencoba lagi."
+            }
         }
     }
 
@@ -80,10 +114,15 @@ class PlaybackController(context: Context) {
 
     /** Putar [song]; [list] adalah antrean untuk tombol berikutnya/sebelumnya. */
     fun play(song: Song, list: List<Song> = listOf(song)) {
+        retries = 0
+        start(song, list, 0L)
+    }
+
+    private fun start(song: Song, list: List<Song>, startMs: Long) {
         queue = list
         current = song
         errorText = null
-        positionMs = 0L
+        positionMs = startMs
         durationMs = 0L
         loadJob?.cancel()
         loading = true
@@ -103,6 +142,7 @@ class PlaybackController(context: Context) {
                     .build()
                 player.setMediaItem(item)
                 player.prepare()
+                if (startMs > 0L) player.seekTo(startMs)
                 player.play()
                 loading = false
             } catch (e: CancellationException) {
@@ -142,7 +182,13 @@ class PlaybackController(context: Context) {
     }
 
     fun togglePlay() {
-        if (current == null) return
+        val song = current ?: return
+        if (errorText != null) {
+            // Setelah gagal, ketuk putar akan mengambil ulang stream.
+            retries = 0
+            start(song, queue, positionMs)
+            return
+        }
         if (player.isPlaying) player.pause() else player.play()
     }
 
@@ -166,12 +212,5 @@ class PlaybackController(context: Context) {
     fun seekTo(ms: Long) {
         player.seekTo(ms)
         positionMs = ms
-    }
-
-    /** Hanya melepas listener dan koneksi UI. Musik tetap berjalan di service. */
-    fun release() {
-        player.removeListener(listener)
-        scope.cancel()
-        MediaController.releaseFuture(browserFuture)
     }
 }
