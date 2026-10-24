@@ -53,6 +53,8 @@ import com.example.applemusicui.ui.playback.PlaybackController
 import com.example.applemusicui.ui.screens.DetailPageScreen
 import com.example.applemusicui.ui.screens.ExploreScreen
 import com.example.applemusicui.ui.screens.LibraryScreen
+import com.example.applemusicui.ui.screens.clearLibraryCache
+import com.example.applemusicui.ui.screens.refreshLibraryCache
 import com.example.applemusicui.ui.screens.ListenNowScreen
 import com.example.applemusicui.ui.screens.AboutScreen
 import com.example.applemusicui.ui.components.UpdateDialog
@@ -87,6 +89,10 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
     // Cek pembaruan diam-diam saat aplikasi dibuka. Gagal atau sudah terbaru: tidak ada popup.
     LaunchedEffect(Unit) {
         update = runCatching { UpdateRepository.newerRelease() }.getOrNull()
+    }
+    // Pustaka dimuat sejak awal, supaya saat tab Pustaka dibuka datanya sudah ada.
+    LaunchedEffect(Unit) {
+        runCatching { refreshLibraryCache() }
     }
     var showLogin by rememberSaveable { mutableStateOf(false) }
     var loggedIn by remember { mutableStateOf(AppPrefs.isLoggedIn()) }
@@ -254,6 +260,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
                     onLogin = { showLogin = true },
                     onLogout = {
                         AppPrefs.logout()
+                        clearLibraryCache()
                         loggedIn = false
                     },
                 )
