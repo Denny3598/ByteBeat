@@ -75,7 +75,18 @@ object InnerTubeClient {
     }
 
     /** Panggilan browse ke YouTube Music. */
-    suspend fun browse(browseId: String): JSONObject = withContext(Dispatchers.IO) {
+    suspend fun browse(browseId: String): JSONObject =
+        call("browse", JSONObject().put("browseId", browseId))
+
+    /** Panggilan next: dipakai untuk radio dan tautan album/artis lagu. */
+    suspend fun next(videoId: String, playlistId: String? = null): JSONObject {
+        val extra = JSONObject().put("videoId", videoId)
+        playlistId?.let { extra.put("playlistId", it) }
+        return call("next", extra)
+    }
+
+    /** Panggilan ke endpoint InnerTube. [extra] berisi field tambahan untuk body. */
+    private suspend fun call(endpoint: String, extra: JSONObject): JSONObject = withContext(Dispatchers.IO) {
         val cookie = sessionCookie()
         val body = JSONObject()
             .put(
@@ -89,10 +100,10 @@ object InnerTubeClient {
                         .put("gl", "ID"),
                 ),
             )
-            .put("browseId", browseId)
+        extra.keys().forEach { body.put(it, extra.get(it)) }
 
         val builder = Request.Builder()
-            .url("$ORIGIN/youtubei/v1/browse?prettyPrint=false")
+            .url("$ORIGIN/youtubei/v1/$endpoint?prettyPrint=false")
             .post(body.toString().toRequestBody(JSON_TYPE))
             .header("User-Agent", USER_AGENT)
             .header("Origin", ORIGIN)
