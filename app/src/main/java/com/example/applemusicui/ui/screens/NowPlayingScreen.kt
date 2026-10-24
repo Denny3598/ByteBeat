@@ -462,4 +462,64 @@ private fun SlimSlider(
             .onSizeChanged { width = it.width.toFloat().coerceAtLeast(1f) }
             .pointerInput(range) {
                 detectTapGestures(
-                    onTap =
+                    onTap = { o ->
+                        changed(range.start + (o.x / width).coerceIn(0f, 1f) * span)
+                        finished()
+                    },
+                )
+            }
+            .pointerInput(range) {
+                detectHorizontalDragGestures(
+                    onDragEnd = { finished() },
+                    onDragCancel = { finished() },
+                    onHorizontalDrag = { change, _ ->
+                        change.consume()
+                        changed(range.start + (change.position.x / width).coerceIn(0f, 1f) * span)
+                    },
+                )
+            },
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(CircleShape)
+                .background(TrackOff),
+        )
+        Box(
+            Modifier
+                .fillMaxWidth(fraction)
+                .height(4.dp)
+                .clip(CircleShape)
+                .background(Fg),
+        )
+    }
+}
+
+@Composable
+private fun CircleIcon(icon: ImageVector, description: String) {
+    Box(
+        Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.18f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = description, tint = Fg, modifier = Modifier.size(22.dp))
+    }
+}
+
+@Composable
+private fun BottomAction(icon: ImageVector, label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(icon, contentDescription = label, tint = Fg, modifier = Modifier.size(26.dp))
+        Spacer(Modifier.height(4.dp))
+        Text(label, color = FgDim, fontSize = 11.sp)
+    }
+}
+
+private fun formatTime(ms: Long): String {
+    val total = ms.coerceAtLeast(0L) / 1000
+    return "%d:%02d".format(total / 60, total % 60)
+}
