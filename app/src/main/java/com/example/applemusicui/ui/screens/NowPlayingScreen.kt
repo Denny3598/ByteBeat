@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
@@ -74,6 +74,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.applemusicui.data.FavoritesStore
+import com.example.applemusicui.data.LikeRepository
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.components.Artwork
 import com.example.applemusicui.ui.components.SongMenuHost
@@ -110,6 +112,15 @@ fun NowPlayingScreen(
     var shuffle by rememberSaveable { mutableStateOf(false) }
     var repeat by rememberSaveable { mutableStateOf(false) }
     var menu by remember { mutableStateOf<SongMenuStyle?>(null) }
+    var sheet by remember { mutableStateOf<NowSheet?>(null) }
+    var liked by remember(song.url) { mutableStateOf(FavoritesStore.isFavorite(context, song.url)) }
+
+    // Status lokal langsung berubah, lalu dikirim ke akun YouTube Music (kalau sudah login).
+    fun toggleLike() {
+        val now = FavoritesStore.toggle(context, song.url)
+        liked = now
+        scope.launch { LikeRepository.setLiked(song.url, now) }
+    }
 
     // Posisi sheet dalam piksel: screenHeightPx = tersembunyi di bawah, 0f = terbuka penuh.
     val sheet = remember { Animatable(screenHeightPx) }
@@ -197,7 +208,7 @@ fun NowPlayingScreen(
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .aspectRatio(1f)
+                        .weight(1f)
                         .graphicsLayer {
                             compositingStrategy = CompositingStrategy.Offscreen
                         }
@@ -219,9 +230,6 @@ fun NowPlayingScreen(
                         imageUrl = song.thumbnail,
                     )
                 }
-
-                // Ruang kosong di antara cover dan info, supaya info dan kontrol turun ke bawah.
-                Spacer(Modifier.weight(1f))
 
                 // Judul, progres, dan waktu (muncul lebih dulu)
                 Column(
@@ -251,7 +259,10 @@ fun NowPlayingScreen(
                             )
                         }
                         Spacer(Modifier.width(12.dp))
-                        CircleIcon(Icons.Filled.FavoriteBorder, "Suka")
+                        CircleIcon(
+                            if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                            "Suka",
+                        ) { toggleLike() }
                         Spacer(Modifier.width(10.dp))
                         CircleIcon(Icons.Filled.MoreHoriz, "Opsi") { menu = SongMenuStyle.Sheet }
                     }
@@ -403,10 +414,13 @@ fun NowPlayingScreen(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                     ) {
-                        BottomAction(Icons.Filled.IosShare, "Bagikan")
-                        BottomAction(Icons.Filled.FormatQuote, "Lirik")
-                        BottomAction(Icons.Filled.FavoriteBorder, "Favorit")
-                        BottomAction(Icons.Filled.QueueMusic, "Antrean")
+                        BottomAction(Icons.Filled.IosShare, "Bagikan") { shareSong(context, song) }
+                        BottomAction(Icons.Filled.FormatQuote, "Lirik") { sheet = NowSheet.Lyrics }
+                        BottomAction(
+                            if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                            "Favorit",
+                        ) { toggleLike() }
+                        BottomAction(Icons.Filled.QueueMusic, "Antrean") { sheet = NowSheet.Queue }
                     }
                 }
             }
@@ -434,6 +448,13 @@ fun NowPlayingScreen(
         // Menu aksi lagu saat titik tiga ditekan.
         menu?.let { style ->
             SongMenuHost(song = song, style = style, onDismiss = { menu = null })
+        }
+
+        // Sheet Lirik dan Antrean.
+        when (sheet) {
+            NowSheet.Lyrics -> LyricsSheet(song = song, onDismiss = { sheet = null })
+            NowSheet.Queue -> QueueSheet(current = song, controller = controller, onDismiss = { sheet = null })
+            null -> Unit
         }
     }
 }
@@ -510,8 +531,11 @@ private fun CircleIcon(icon: ImageVector, description: String, onClick: () -> Un
 }
 
 @Composable
-private fun BottomAction(icon: ImageVector, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun BottomAction(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable(onClick = onClick).padding(8.dp),
+    ) {
         Icon(icon, contentDescription = label, tint = Fg, modifier = Modifier.size(26.dp))
         Spacer(Modifier.height(4.dp))
         Text(label, color = FgDim, fontSize = 11.sp)
