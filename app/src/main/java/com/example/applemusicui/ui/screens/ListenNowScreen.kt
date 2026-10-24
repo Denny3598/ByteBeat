@@ -27,10 +27,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -38,26 +38,26 @@ import androidx.compose.ui.unit.sp
 import com.example.applemusicui.data.HomeCardItem
 import com.example.applemusicui.data.HomeRepository
 import com.example.applemusicui.data.HomeShelf
-import com.example.applemusicui.data.LibraryRepository
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.components.Artwork
 import com.example.applemusicui.ui.components.ScreenHeader
 import com.example.applemusicui.ui.theme.AppTheme
 import com.example.applemusicui.ui.theme.AppleRed
-import androidx.compose.ui.graphics.Color
-import kotlinx.coroutines.launch
 
 @Composable
-fun ListenNowScreen(current: Song, onPlay: (Song, List<Song>) -> Unit) {
+fun ListenNowScreen(
+    current: Song,
+    onPlay: (Song, List<Song>) -> Unit,
+    onOpenPage: (String) -> Unit,
+) {
     val c = AppTheme.colors
-    val scope = rememberCoroutineScope()
     var shelves by remember { mutableStateOf<List<HomeShelf>?>(null) }
-    var busyId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         shelves = runCatching { HomeRepository.shelves() }.getOrDefault(emptyList())
     }
 
+    // Lagu langsung diputar; album, playlist, dan artis dibuka halamannya.
     fun open(item: HomeCardItem, shelf: HomeShelf) {
         if (item.videoId != null) {
             val song = item.toSong() ?: return
@@ -66,13 +66,7 @@ fun ListenNowScreen(current: Song, onPlay: (Song, List<Song>) -> Unit) {
             return
         }
         val browseId = item.browseId ?: return
-        if (busyId != null) return
-        busyId = browseId
-        scope.launch {
-            val songs = runCatching { LibraryRepository.tracks(browseId) }.getOrDefault(emptyList())
-            busyId = null
-            songs.firstOrNull()?.let { onPlay(it, songs) }
-        }
+        onOpenPage(browseId)
     }
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
