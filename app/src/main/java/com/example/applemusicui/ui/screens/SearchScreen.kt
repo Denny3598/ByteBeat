@@ -10,11 +10,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -37,12 +39,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.applemusicui.data.AppPrefs
+import com.example.applemusicui.data.LibraryItem
+import com.example.applemusicui.data.SearchResults
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.data.YouTubeMusicRepository
+import com.example.applemusicui.ui.components.Artwork
 import com.example.applemusicui.ui.components.ScreenHeader
 import com.example.applemusicui.ui.components.SongRow
 import com.example.applemusicui.ui.theme.AppTheme
@@ -53,6 +60,8 @@ import kotlinx.coroutines.isActive
 private const val HISTORY_FILE = "search_history"
 private const val HISTORY_KEY = "items"
 private const val HISTORY_MAX = 12
+
+private val EMPTY_RESULTS = SearchResults(emptyList(), emptyList(), emptyList(), emptyList())
 
 private fun loadHistory(context: Context): List<String> {
     val raw = context.getSharedPreferences(HISTORY_FILE, Context.MODE_PRIVATE)
@@ -78,12 +87,16 @@ private fun pushHistory(context: Context, query: String): List<String> {
 }
 
 @Composable
-fun SearchScreen(current: Song, onPlay: (Song, List<Song>) -> Unit) {
+fun SearchScreen(
+    current: Song,
+    onPlay: (Song, List<Song>) -> Unit,
+    onOpenPage: (String) -> Unit,
+) {
     val c = AppTheme.colors
     val context = LocalContext.current
 
     var query by rememberSaveable { mutableStateOf("") }
-    var results by remember { mutableStateOf<List<Song>?>(null) }
+    var results by remember { mutableStateOf<SearchResults?>(null) }
     var loading by remember { mutableStateOf(false) }
     var history by remember { mutableStateOf(loadHistory(context)) }
 
@@ -98,11 +111,11 @@ fun SearchScreen(current: Song, onPlay: (Song, List<Song>) -> Unit) {
         delay(450)
         val musicOnly = AppPrefs.prefs(context).getBoolean("music_only", true)
         val found = try {
-            YouTubeMusicRepository.searchSongs(q, songsOnly = musicOnly)
+            YouTubeMusicRepository.searchAll(q, songsOnly = musicOnly)
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            emptyList()
+            EMPTY_RESULTS
         }
         // Kalau pengguna sudah mengetik lagi, hasil lama ini dibuang.
         if (!isActive) return@LaunchedEffect
@@ -226,8 +239,8 @@ fun SearchScreen(current: Song, onPlay: (Song, List<Song>) -> Unit) {
                 CircularProgressIndicator()
             }
         } else {
-            val list = results.orEmpty()
-            if (list.isEmpty()) {
+            val found = results ?: EMPTY_RESULTS
+            if (found.isEmpty) {
                 Box(
                     Modifier
                         .weight(1f)
@@ -245,15 +258,100 @@ fun SearchScreen(current: Song, onPlay: (Song, List<Song>) -> Unit) {
                 LazyColumn(
                     Modifier.weight(1f),
                     contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 200.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    items(list) { song ->
-                        SongRow(song, highlighted = song.url == current.url) {
-                            onPlay(song, list)
+                    if (found.artists.isNotEmpty()) {
+                        item { SectionTitle("Artis") }
+                        item {
+                            CollectionRow(found.artists, round = true, onOpen = onOpenPage)
+                        }
+                    }
+                    if (found.songs.isNotEmpty()) {
+                        item { SectionTitle("Lagu") }
+                        items(found.songs) { song ->
+                            SongRow(song, highlighted = song.url == current.url) {
+                                onPlay(song, found.songs)
+                            }
+                        }
+                    }
+                    if (found.albums.isNotEmpty()) {
+                        item { SectionTitle("Album") }
+                        item {
+                            CollectionRow(found.albums, round = false, onOpen = onOpenPage)
+                        }
+                    }
+                    if (found.playlists.isNotEmpty()) {
+                        item { SectionTitle("Playlist") }
+                        item {
+                            CollectionRow(found.playlists, round = false, onOpen = onOpenPage)
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SectionTitle(title: String) {
+    Text(
+        title,
+        color = AppTheme.colors.text,
+        fontSize = 20.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(top = 20.dp, bottom = 10.dp),
+    )
+}
+
+/** Deretan kartu horizontal. Artis dibuat bulat, album dan playlist persegi. */
+@Composable
+private fun CollectionRow(list: List<LibraryItem>, round: Boolean, onOpen: (String) -> Unit) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(bottom = 4.dp),
+    ) {
+        items(list) { item ->
+            CollectionCard(item, round) { onOpen(item.browseId) }
+        }
+    }
+}
+
+@Composable
+private fun CollectionCard(item: LibraryItem, round: Boolean, onClick: () -> Unit) {
+    val c = AppTheme.colors
+    val size: Dp = if (round) 130.dp else 150.dp
+    val align = if (round) Alignment.CenterHorizontally else Alignment.Start
+    val textAlign = if (round) TextAlign.Center else TextAlign.Start
+    Column(
+        Modifier
+            .width(size)
+            .clickable(onClick = onClick),
+        horizontalAlignment = align,
+    ) {
+        Artwork(
+            listOf(AppleRed, c.surface),
+            Modifier.size(size),
+            corner = if (round) size / 2 else 10.dp,
+            imageUrl = item.thumbnail,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            item.title,
+            color = c.text,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = textAlign,
+        )
+        if (item.subtitle.isNotBlank()) {
+            Text(
+                item.subtitle,
+                color = c.textSecondary,
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = textAlign,
+            )
         }
     }
 }
