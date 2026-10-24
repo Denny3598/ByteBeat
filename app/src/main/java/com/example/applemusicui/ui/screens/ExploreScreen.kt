@@ -1,6 +1,7 @@
 package com.example.applemusicui.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,23 +41,42 @@ import com.example.applemusicui.data.ExploreMood
 import com.example.applemusicui.data.ExploreRepository
 import com.example.applemusicui.ui.components.ScreenHeader
 import com.example.applemusicui.ui.theme.AppTheme
+import kotlinx.coroutines.CancellationException
+
+private sealed interface ExploreState {
+    data object Loading : ExploreState
+    data class Ok(val moods: List<ExploreMood>) : ExploreState
+    data class Error(val message: String) : ExploreState
+}
 
 @Composable
 fun ExploreScreen() {
-    var moods by remember { mutableStateOf<List<ExploreMood>?>(null) }
+    val c = AppTheme.colors
+    var state by remember { mutableStateOf<ExploreState>(ExploreState.Loading) }
+    var attempt by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) {
-        moods = runCatching { ExploreRepository.moods() }.getOrDefault(emptyList())
+    LaunchedEffect(attempt) {
+        state = ExploreState.Loading
+        state = try {
+            val list = ExploreRepository.moods()
+            if (list.isEmpty()) {
+                ExploreState.Error("YouTube Music tidak mengirim daftar kategori.")
+            } else {
+                ExploreState.Ok(list)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            ExploreState.Error("Gagal memuat: ${e.javaClass.simpleName} ${e.message.orEmpty()}")
+        }
     }
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        // Judul memakai margin yang sama dengan Listen Now (20dp dari komponen ScreenHeader).
         ScreenHeader("Jelajahi")
         Spacer(Modifier.height(12.dp))
 
-        val list = moods
-        when {
-            list == null -> Box(
+        when (val s = state) {
+            is ExploreState.Loading -> Box(
                 Modifier
                     .weight(1f)
                     .fillMaxWidth(),
@@ -64,28 +85,40 @@ fun ExploreScreen() {
                 CircularProgressIndicator()
             }
 
-            list.isEmpty() -> Box(
+            is ExploreState.Error -> Column(
                 Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
-                contentAlignment = Alignment.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
             ) {
                 Text(
-                    "Kategori belum bisa dimuat. Coba buka lagi nanti.",
-                    color = AppTheme.colors.textSecondary,
+                    s.message,
+                    color = c.textSecondary,
                     fontSize = 15.sp,
+                    textAlign = TextAlign.Center,
                 )
+                Spacer(Modifier.height(16.dp))
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(c.text)
+                        .clickable { attempt++ }
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                ) {
+                    Text("Coba lagi", color = c.background, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                }
             }
 
-            else -> LazyVerticalGrid(
+            is ExploreState.Ok -> LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 200.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                items(list, key = { it.browseId }) { mood ->
+                items(s.moods, key = { it.browseId }) { mood ->
                     MoodCard(mood)
                 }
             }
