@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PlayCircle
@@ -62,6 +63,7 @@ fun SettingsScreen(
     loggedIn: Boolean,
     onBack: () -> Unit,
     onOpenAccount: () -> Unit,
+    onOpenAbout: () -> Unit,
 ) {
     val c = AppTheme.colors
     val prefs = AppPrefs.prefs(LocalContext.current)
@@ -194,7 +196,12 @@ fun SettingsScreen(
 
         SectionLabel("Tentang")
         SettingsCard {
-            SettingsRow(Icons.Filled.Tune, "Versi aplikasi", value = "1.0")
+            SettingsRow(
+                icon = Icons.Filled.Info,
+                title = "Tentang ByteBeat",
+                value = "1.0.0",
+                onClick = onOpenAbout,
+            )
         }
 
         Text(
