@@ -53,6 +53,7 @@ import com.example.applemusicui.ui.screens.DetailPageScreen
 import com.example.applemusicui.ui.screens.ExploreScreen
 import com.example.applemusicui.ui.screens.LibraryScreen
 import com.example.applemusicui.ui.screens.ListenNowScreen
+import com.example.applemusicui.ui.screens.AccountScreen
 import com.example.applemusicui.ui.screens.LoginScreen
 import com.example.applemusicui.ui.screens.NowPlayingScreen
 import com.example.applemusicui.ui.screens.SearchScreen
@@ -70,6 +71,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
     var showNowPlaying by rememberSaveable { mutableStateOf(false) }
     var showAvatarMenu by rememberSaveable { mutableStateOf(false) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showAccount by rememberSaveable { mutableStateOf(false) }
     var showLogin by rememberSaveable { mutableStateOf(false) }
     var loggedIn by remember { mutableStateOf(AppPrefs.isLoggedIn()) }
 
@@ -87,6 +89,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
     BackHandler(enabled = showNowPlaying) { showNowPlaying = false }
     BackHandler(enabled = showAvatarMenu) { showAvatarMenu = false }
     BackHandler(enabled = showSettings) { showSettings = false }
+    BackHandler(enabled = showAccount) { showAccount = false }
     BackHandler(enabled = showLogin) { showLogin = false }
     BackHandler(enabled = pages.isNotEmpty()) { closePage() }
 
@@ -173,8 +176,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
                     ) {
                         AvatarMenuItem(Icons.Filled.AccountCircle, "Akun") {
                             showAvatarMenu = false
-                            // Kalau sudah login, buka Pengaturan (ada bagian akun dan keluar). Kalau belum, buka login.
-                            if (loggedIn) showSettings = true else showLogin = true
+                            showAccount = true
                         }
                         AvatarMenuItem(Icons.Filled.Settings, "Pengaturan") {
                             showAvatarMenu = false
@@ -198,6 +200,14 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
                     onThemeModeChange = onThemeModeChange,
                     loggedIn = loggedIn,
                     onBack = { showSettings = false },
+                    onOpenAccount = { showAccount = true },
+                )
+            }
+
+            if (showAccount) {
+                AccountScreen(
+                    loggedIn = loggedIn,
+                    onBack = { showAccount = false },
                     onLogin = { showLogin = true },
                     onLogout = {
                         AppPrefs.logout()
