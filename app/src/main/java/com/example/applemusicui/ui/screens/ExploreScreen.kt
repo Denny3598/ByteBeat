@@ -134,7 +134,7 @@ fun ExploreScreen(onOpenCategory: (String, String?, String) -> Unit = { _, _, _ 
                 ) {
                     // Pintu masuk podcast: rak podcast dari YouTube Music dibuka lewat halaman kategori.
                     item(key = "podcast") {
-                        PodcastCard { onOpenCategory("FEmusic_podcasts", null, "Podcast") }
+                        PodcastCard { onOpenCategory("FEmusic_non_music_audio", null, "Podcast") }
                     }
                     items(
                         rows,

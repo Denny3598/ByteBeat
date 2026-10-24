@@ -56,6 +56,8 @@ import com.example.applemusicui.data.AlbumPage
 import com.example.applemusicui.data.ArtistPage
 import com.example.applemusicui.data.DetailRepository
 import com.example.applemusicui.data.LibraryItem
+import com.example.applemusicui.data.PodcastDetail
+import com.example.applemusicui.data.PodcastEpisode
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.components.Artwork
 import com.example.applemusicui.ui.components.rememberCoverTint
@@ -68,6 +70,7 @@ private sealed interface DetailState {
     data class Error(val message: String) : DetailState
     data class Album(val page: AlbumPage) : DetailState
     data class Artist(val page: ArtistPage) : DetailState
+    data class Podcast(val page: PodcastDetail) : DetailState
 }
 
 /** Pilihan urutan lagu di halaman album dan playlist. */
@@ -106,6 +109,8 @@ fun DetailPageScreen(
         state = try {
             if (isArtist) {
                 DetailState.Artist(DetailRepository.artist(browseId))
+            } else if (browseId.startsWith("MPSP")) {
+                DetailState.Podcast(DetailRepository.podcast(browseId))
             } else {
                 DetailState.Album(DetailRepository.album(browseId))
             }
@@ -124,6 +129,7 @@ fun DetailPageScreen(
             is DetailState.Error -> ErrorBody(s.message) { attempt++ }
             is DetailState.Album -> AlbumBody(s.page, onPlay)
             is DetailState.Artist -> ArtistBody(s.page, onPlay, onOpenPage)
+            is DetailState.Podcast -> PodcastBody(s.page, onPlay)
         }
 
         // Tombol kembali, di atas konten.
@@ -343,27 +349,30 @@ private fun ArtistBody(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(Modifier.height(16.dp))
+                    // Tombol Putar tepat di tengah; Acak di kiri, dengan ruang kosong di kanan agar seimbang.
                     Row(
+                        Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(24.dp),
                     ) {
-                        Box(
-                            Modifier
-                                .size(52.dp)
-                                .clip(CircleShape)
-                                .background(c.textSecondary.copy(alpha = 0.15f))
-                                .clickable {
-                                    val list = page.topSongs.shuffled()
-                                    list.firstOrNull()?.let { onPlay(it, list) }
-                                },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                Icons.Filled.Shuffle,
-                                contentDescription = "Acak",
-                                tint = c.text,
-                                modifier = Modifier.size(22.dp),
-                            )
+                        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                            Box(
+                                Modifier
+                                    .size(52.dp)
+                                    .clip(CircleShape)
+                                    .background(c.textSecondary.copy(alpha = 0.15f))
+                                    .clickable {
+                                        val list = page.topSongs.shuffled()
+                                        list.firstOrNull()?.let { onPlay(it, list) }
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Filled.Shuffle,
+                                    contentDescription = "Acak",
+                                    tint = c.text,
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            }
                         }
                         Box(
                             Modifier
@@ -382,6 +391,7 @@ private fun ArtistBody(
                                 modifier = Modifier.size(36.dp),
                             )
                         }
+                        Box(Modifier.weight(1f))
                     }
                     page.description?.let { desc ->
                         Text(
@@ -420,6 +430,166 @@ private fun ArtistBody(
     }
 }
 
+/** Halaman show podcast, mengikuti PodcastScreen ArchiveTune: header besar, lalu daftar episode dengan cover, tanggal, dan durasi. */
+@Composable
+private fun PodcastBody(page: PodcastDetail, onPlay: (Song, List<Song>) -> Unit) {
+    val c = AppTheme.colors
+    var sort by remember(page.title) { mutableStateOf(TrackSort.Original) }
+    val episodes = remember(page.episodes, sort) { sort.applyEpisodes(page.episodes) }
+    val songs = remember(episodes) { episodes.map { it.song } }
+    val tint = rememberCoverTint(page.thumbnail)
+
+    Box(Modifier.fillMaxSize()) {
+        PageBackdrop(page.thumbnail, tint)
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 200.dp),
+        ) {
+            item {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(top = 64.dp, start = 20.dp, end = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Artwork(
+                        listOf(AppleRed, c.surface),
+                        Modifier
+                            .fillMaxWidth(0.66f)
+                            .aspectRatio(1f)
+                            .shadow(18.dp, RoundedCornerShape(12.dp)),
+                        corner = 12.dp,
+                        imageUrl = page.thumbnail,
+                    )
+                    Spacer(Modifier.height(18.dp))
+                    Text(
+                        page.title,
+                        color = c.text,
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                    )
+                    if (page.author.isNotBlank()) {
+                        Text(
+                            page.author,
+                            color = c.textSecondary,
+                            fontSize = 15.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                    Text(
+                        "${page.episodes.size} episode",
+                        color = c.textSecondary,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                    Spacer(Modifier.height(18.dp))
+                    ActionRow(
+                        onPlay = { songs.firstOrNull()?.let { onPlay(it, songs) } },
+                        onShuffle = {
+                            val list = songs.shuffled()
+                            list.firstOrNull()?.let { onPlay(it, list) }
+                        },
+                        sort = sort,
+                        onSort = { sort = it },
+                    )
+                    page.description?.takeIf(String::isNotBlank)?.let { desc ->
+                        Text(
+                            desc,
+                            color = c.textSecondary,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            textAlign = TextAlign.Center,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 16.dp),
+                        )
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+            }
+            items(episodes, key = { it.song.url }) { episode ->
+                EpisodeRow(episode) { onPlay(episode.song, songs) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EpisodeRow(episode: PodcastEpisode, onClick: () -> Unit) {
+    val c = AppTheme.colors
+    val meta = listOfNotNull(episode.dateText, episode.durationText).joinToString("  •  ")
+    Column {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Artwork(
+                listOf(AppleRed, c.surface),
+                Modifier.size(88.dp),
+                corner = 12.dp,
+                imageUrl = episode.song.thumbnail,
+            )
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    episode.song.title,
+                    color = c.text,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (episode.song.artist.isNotBlank()) {
+                    Text(
+                        episode.song.artist,
+                        color = c.textSecondary,
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (meta.isNotBlank()) {
+                    Text(
+                        meta,
+                        color = c.textSecondary,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                episode.description?.takeIf(String::isNotBlank)?.let { desc ->
+                    Text(
+                        desc,
+                        color = c.textSecondary,
+                        fontSize = 13.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+        }
+        HorizontalDivider(
+            modifier = Modifier.padding(start = 122.dp),
+            thickness = 0.5.dp,
+            color = c.divider,
+        )
+    }
+}
+
+private fun TrackSort.applyEpisodes(list: List<PodcastEpisode>): List<PodcastEpisode> = when (this) {
+    TrackSort.Original -> list
+    TrackSort.TitleAsc -> list.sortedBy { it.song.title.lowercase() }
+    TrackSort.TitleDesc -> list.sortedByDescending { it.song.title.lowercase() }
+    TrackSort.ArtistAsc -> list.sortedBy { it.song.artist.lowercase() }
+}
+
 @Composable
 private fun ActionRow(
     onPlay: () -> Unit,
@@ -429,10 +599,28 @@ private fun ActionRow(
 ) {
     val c = AppTheme.colors
     var sortMenuOpen by remember { mutableStateOf(false) }
+    // Tombol Putar tepat di tengah; Acak di kiri dan Urutkan di kanan dengan jarak yang sama.
     Row(
+        Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+            Box(
+                Modifier
+                    .size(50.dp)
+                    .clip(CircleShape)
+                    .background(c.textSecondary.copy(alpha = 0.15f))
+                    .clickable(onClick = onShuffle),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.Shuffle,
+                    contentDescription = "Acak",
+                    tint = c.text,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+        }
         Row(
             Modifier
                 .width(150.dp)
@@ -452,23 +640,8 @@ private fun ActionRow(
             Spacer(Modifier.width(6.dp))
             Text("Putar", color = c.background, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
-        Box(
-            Modifier
-                .size(50.dp)
-                .clip(CircleShape)
-                .background(c.textSecondary.copy(alpha = 0.15f))
-                .clickable(onClick = onShuffle),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Filled.Shuffle,
-                contentDescription = "Acak",
-                tint = c.text,
-                modifier = Modifier.size(22.dp),
-            )
-        }
         // Tombol urutkan dengan menu pilihan di bawahnya.
-        Box {
+        Box(Modifier.weight(1f)) {
             Box(
                 Modifier
                     .size(50.dp)
