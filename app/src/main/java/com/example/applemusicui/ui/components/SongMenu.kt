@@ -1,6 +1,8 @@
 package com.example.applemusicui.ui.components
 
+import android.content.Context
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -16,10 +18,13 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlaylistPlay
+import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
@@ -48,6 +53,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.applemusicui.data.FavoritesStore
 import com.example.applemusicui.data.LikeRepository
+import com.example.applemusicui.data.SongExtras
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.playback.PlaybackController
 import com.example.applemusicui.ui.theme.AppTheme
@@ -55,14 +61,70 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Controller pemutar, dibagikan ke seluruh layar lewat CompositionLocal (diisi di AppRoot). */
 val LocalPlaybackController = staticCompositionLocalOf<PlaybackController?> { null }
+
+/** Membuka halaman album atau artis (diisi di AppRoot). */
+val LocalOpenPage = staticCompositionLocalOf<((String) -> Unit)?> { null }
 
 /** Popup: tampil saat baris lagu ditahan. Sheet: tampil saat titik tiga ditekan. */
 enum class SongMenuStyle { Popup, Sheet }
 
 private class SongAction(val label: String, val icon: ImageVector, val run: () -> Unit)
+
+private fun videoIdOf(song: Song): String? =
+    song.url.substringAfter("v=", "").substringBefore("&").ifEmpty { null }
+
+private fun toast(context: Context, text: String) {
+    Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+}
+
+/** Mulai radio dari lagu ini. Antrean diganti dengan lagu-lagu radio YouTube Music. */
+private fun startRadio(song: Song, controller: PlaybackController?, context: Context, onDismiss: () -> Unit) {
+    onDismiss()
+    val vid = videoIdOf(song)
+    if (vid == null) {
+        toast(context, "Lagu ini tidak punya radio")
+        return
+    }
+    CoroutineScope(SupervisorJob() + Dispatchers.Main).launch {
+        val radio = withContext(Dispatchers.IO) {
+            runCatching { SongExtras.radio(vid) }.getOrDefault(emptyList())
+        }
+        if (radio.isEmpty()) {
+            toast(context, "Radio tidak bisa dimuat")
+        } else {
+            controller?.play(radio.first(), radio)
+        }
+    }
+}
+
+/** Membuka album atau artis dari lagu ini. Tautannya diambil dulu dari YouTube Music. */
+private fun openLink(
+    song: Song,
+    context: Context,
+    openPage: ((String) -> Unit)?,
+    onDismiss: () -> Unit,
+    album: Boolean,
+) {
+    onDismiss()
+    val vid = videoIdOf(song)
+    if (vid == null || openPage == null) {
+        toast(context, "Tidak bisa dibuka")
+        return
+    }
+    CoroutineScope(SupervisorJob() + Dispatchers.Main).launch {
+        val links = withContext(Dispatchers.IO) { runCatching { SongExtras.links(vid) }.getOrNull() }
+        val id = if (album) links?.albumId else links?.artistId
+        if (id == null) {
+            toast(context, if (album) "Album tidak ditemukan" else "Artis tidak ditemukan")
+        } else {
+            openPage(id)
+        }
+    }
+}
 
 /**
  * Menu aksi untuk satu lagu: Suka, putar berikutnya, antrean, info lagu, dan bagikan.
@@ -89,6 +151,7 @@ fun SongMenuHost(song: Song, style: SongMenuStyle, onDismiss: () -> Unit) {
 private fun rememberSongActions(song: Song, onDismiss: () -> Unit, onInfo: () -> Unit): List<SongAction> {
     val context = LocalContext.current
     val controller = LocalPlaybackController.current
+    val openPage = LocalOpenPage.current
     val liked = FavoritesStore.isFavorite(context, song.url)
     return listOf(
         SongAction(
@@ -103,6 +166,7 @@ private fun rememberSongActions(song: Song, onDismiss: () -> Unit, onInfo: () ->
             }
             onDismiss()
         },
+        SongAction("Mulai radio", Icons.Filled.Radio) { startRadio(song, controller, context, onDismiss) },
         SongAction("Putar berikutnya", Icons.Filled.PlaylistPlay) {
             controller?.playNext(song)
             onDismiss()
@@ -111,6 +175,8 @@ private fun rememberSongActions(song: Song, onDismiss: () -> Unit, onInfo: () ->
             controller?.addToQueue(song)
             onDismiss()
         },
+        SongAction("Buka album", Icons.Filled.Album) { openLink(song, context, openPage, onDismiss, album = true) },
+        SongAction("Buka artis", Icons.Filled.Person) { openLink(song, context, openPage, onDismiss, album = false) },
         SongAction("Info lagu", Icons.Filled.Info) { onInfo() },
         SongAction("Bagikan", Icons.Filled.Share) {
             val send = Intent(Intent.ACTION_SEND)
