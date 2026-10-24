@@ -22,12 +22,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,9 +68,35 @@ fun ListenNowScreen(
 ) {
     val c = AppTheme.colors
     var shelves by remember { mutableStateOf<List<HomeShelf>?>(null) }
+    var token by remember { mutableStateOf<String?>(null) }
+    var loadingMore by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
 
+    // Halaman pertama.
     LaunchedEffect(Unit) {
-        shelves = runCatching { HomeRepository.shelves() }.getOrDefault(emptyList())
+        val page = runCatching { HomeRepository.firstPage() }.getOrNull()
+        shelves = page?.shelves ?: emptyList()
+        token = page?.continuation
+    }
+
+    // Rak berikutnya dimuat saat pengguna menggulir mendekati akhir daftar, seperti BitChord.
+    LaunchedEffect(Unit) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
+            .collect { last ->
+                val count = shelves?.size ?: 0
+                val t = token
+                if (t != null && !loadingMore && count > 0 && last >= count - 2) {
+                    loadingMore = true
+                    val page = runCatching { HomeRepository.nextPage(t) }.getOrNull()
+                    if (page != null) {
+                        shelves = shelves.orEmpty() + page.shelves
+                        token = page.continuation
+                    } else {
+                        token = null
+                    }
+                    loadingMore = false
+                }
+            }
     }
 
     // Lagu langsung diputar; album, playlist, dan artis dibuka halamannya.
@@ -105,6 +134,7 @@ fun ListenNowScreen(
 
             else -> LazyColumn(
                 Modifier.weight(1f),
+                state = listState,
                 contentPadding = PaddingValues(bottom = 200.dp),
             ) {
                 list.forEachIndexed { index, shelf ->
@@ -114,6 +144,17 @@ fun ListenNowScreen(
                         } else {
                             SquareShelf(shelf) { item -> open(item, shelf) }
                         }
+                    }
+                }
+                if (loadingMore) {
+                    item(key = "loading-more") {
+                        CircularProgressIndicator(
+                            color = c.textSecondary,
+                            modifier = Modifier
+                                .padding(vertical = 24.dp)
+                                .fillMaxWidth()
+                                .wrapContentWidth(Alignment.CenterHorizontally),
+                        )
                     }
                 }
             }
