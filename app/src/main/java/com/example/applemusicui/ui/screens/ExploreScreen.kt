@@ -132,10 +132,6 @@ fun ExploreScreen(onOpenCategory: (String, String?, String) -> Unit = { _, _, _ 
                     Modifier.weight(1f),
                     contentPadding = PaddingValues(bottom = 200.dp),
                 ) {
-                    // Pintu masuk podcast: rak podcast dari YouTube Music dibuka lewat halaman kategori.
-                    item(key = "podcast") {
-                        PodcastCard { onOpenCategory("FEmusic_non_music_audio", null, "Podcast") }
-                    }
                     items(
                         rows,
                         key = { row -> row.first().let { "${it.browseId}|${it.params.orEmpty()}" } },
@@ -156,36 +152,6 @@ fun ExploreScreen(onOpenCategory: (String, String?, String) -> Unit = { _, _, _ 
                     }
                 }
             }
-        }
-    }
-}
-
-/** Kartu transparan di atas daftar kategori: membuka podcast dari YouTube Music. */
-@Composable
-private fun PodcastCard(onClick: () -> Unit) {
-    val c = AppTheme.colors
-    val shape = RoundedCornerShape(18.dp)
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(start = 20.dp, end = 20.dp, bottom = 12.dp)
-            .clip(shape)
-            .background(c.glass)
-            .border(1.dp, c.glassBorder, shape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            Icons.Filled.Podcasts,
-            contentDescription = null,
-            tint = c.text,
-            modifier = Modifier.size(28.dp),
-        )
-        Spacer(Modifier.width(16.dp))
-        Column(Modifier.weight(1f)) {
-            Text("Podcast", color = c.text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Text("Dari YouTube Music", color = c.textSecondary, fontSize = 14.sp)
         }
     }
 }

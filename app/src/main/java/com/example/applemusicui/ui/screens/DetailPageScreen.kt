@@ -127,7 +127,21 @@ fun DetailPageScreen(
                 CircularProgressIndicator()
             }
             is DetailState.Error -> ErrorBody(s.message) { attempt++ }
-            is DetailState.Album -> AlbumBody(s.page, onPlay)
+            is DetailState.Album -> if (s.page.episodes.isNotEmpty()) {
+                // Halaman berisi episode (misalnya "Episode Baru") ditampilkan seperti halaman podcast.
+                PodcastBody(
+                    PodcastDetail(
+                        title = s.page.title,
+                        author = s.page.subtitle,
+                        thumbnail = s.page.thumbnail,
+                        description = null,
+                        episodes = s.page.episodes,
+                    ),
+                    onPlay,
+                )
+            } else {
+                AlbumBody(s.page, onPlay)
+            }
             is DetailState.Artist -> ArtistBody(s.page, onPlay, onOpenPage)
             is DetailState.Podcast -> PodcastBody(s.page, onPlay)
         }

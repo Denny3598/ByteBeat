@@ -24,8 +24,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
@@ -130,7 +132,6 @@ fun LibraryScreen(
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         ScreenHeader("Perpustakaan")
-        SectionChips(selected = selected, onSelect = { selected = it })
 
         message?.let { msg ->
             Text(
@@ -148,32 +149,6 @@ fun LibraryScreen(
                 Modifier.weight(1f),
                 contentPadding = PaddingValues(bottom = 200.dp),
             ) {
-                item {
-                    LinkRow(
-                        title = "Unduhan",
-                        subtitle = "Musik yang disimpan untuk offline",
-                        icon = Icons.Filled.Download,
-                    )
-                }
-                item {
-                    LinkRow(
-                        title = "Musik lokal",
-                        subtitle = "Dari perangkat ini",
-                        icon = Icons.Filled.MusicNote,
-                    )
-                }
-                if (loggedIn) {
-                    item {
-                        LinkRow(
-                            title = "Lagu yang disukai",
-                            subtitle = "Dari akun YouTube Music",
-                            icon = Icons.Filled.Favorite,
-                            busy = busyId == LIKED_ID,
-                            onClick = { open(LibraryItem("Lagu yang disukai", "", null, LIKED_ID)) },
-                        )
-                    }
-                }
-
                 if (!loggedIn) {
                     item {
                         Text(
@@ -215,6 +190,36 @@ fun LibraryScreen(
             }
         } else {
             val list = data?.get(current).orEmpty()
+            // Judul dan tombol kembali untuk tampilan "Lihat semua".
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(c.surface)
+                        .clickable { selected = null },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Kembali",
+                        tint = c.text,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    current.label,
+                    color = c.text,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 modifier = Modifier.weight(1f),
@@ -231,41 +236,6 @@ fun LibraryScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun SectionChips(selected: LibrarySection?, onSelect: (LibrarySection?) -> Unit) {
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.padding(bottom = 8.dp),
-    ) {
-        item {
-            LibraryChip("Semua", selected = selected == null) { onSelect(null) }
-        }
-        items(LibrarySection.entries) { section ->
-            LibraryChip(section.label, selected = selected == section) { onSelect(section) }
-        }
-    }
-}
-
-@Composable
-private fun LibraryChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    val c = AppTheme.colors
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(percent = 50))
-            .background(if (selected) c.text else c.textSecondary.copy(alpha = 0.12f))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-    ) {
-        Text(
-            label,
-            color = if (selected) c.background else c.text,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium,
-        )
     }
 }
 
