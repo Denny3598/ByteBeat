@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
@@ -54,6 +55,9 @@ import com.example.applemusicui.ui.screens.ExploreScreen
 import com.example.applemusicui.ui.screens.LibraryScreen
 import com.example.applemusicui.ui.screens.ListenNowScreen
 import com.example.applemusicui.ui.screens.AboutScreen
+import com.example.applemusicui.ui.components.UpdateDialog
+import com.example.applemusicui.data.UpdateInfo
+import com.example.applemusicui.data.UpdateRepository
 import com.example.applemusicui.ui.screens.CategoryScreen
 import com.example.applemusicui.ui.screens.categoryKey
 import com.example.applemusicui.ui.screens.parseCategoryKey
@@ -77,6 +81,13 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showAccount by rememberSaveable { mutableStateOf(false) }
     var showAbout by rememberSaveable { mutableStateOf(false) }
+    // Pembaruan yang ditemukan; kalau tidak null, popup unduhan ditampilkan.
+    var update by remember { mutableStateOf<UpdateInfo?>(null) }
+
+    // Cek pembaruan diam-diam saat aplikasi dibuka. Gagal atau sudah terbaru: tidak ada popup.
+    LaunchedEffect(Unit) {
+        update = runCatching { UpdateRepository.newerRelease() }.getOrNull()
+    }
     var showLogin by rememberSaveable { mutableStateOf(false) }
     var loggedIn by remember { mutableStateOf(AppPrefs.isLoggedIn()) }
 
@@ -226,7 +237,14 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
             }
 
             if (showAbout) {
-                AboutScreen(onBack = { showAbout = false })
+                AboutScreen(
+                    onBack = { showAbout = false },
+                    onUpdateFound = { update = it },
+                )
+            }
+
+            update?.let { info ->
+                UpdateDialog(info = info) { update = null }
             }
 
             if (showAccount) {
