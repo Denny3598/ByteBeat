@@ -1,8 +1,8 @@
 package com.example.applemusicui.ui.screens
 
-import androidx.compose.foundation.background
+import android.content.Context
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -10,322 +10,250 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.applemusicui.data.AppPrefs
-import com.example.applemusicui.data.RecentSearch
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.data.YouTubeMusicRepository
-import com.example.applemusicui.data.defaultRecentSearches
-import com.example.applemusicui.ui.components.Artwork
-import com.example.applemusicui.ui.components.Avatar
-import com.example.applemusicui.ui.components.SectionHeader
+import com.example.applemusicui.ui.components.ScreenHeader
 import com.example.applemusicui.ui.components.SongRow
 import com.example.applemusicui.ui.theme.AppTheme
 import com.example.applemusicui.ui.theme.AppleRed
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+
+private const val HISTORY_FILE = "search_history"
+private const val HISTORY_KEY = "items"
+private const val HISTORY_MAX = 12
+
+private fun loadHistory(context: Context): List<String> {
+    val raw = context.getSharedPreferences(HISTORY_FILE, Context.MODE_PRIVATE)
+        .getString(HISTORY_KEY, "")
+        .orEmpty()
+    return raw.split("\n").filter { it.isNotBlank() }
+}
+
+private fun saveHistory(context: Context, items: List<String>) {
+    context.getSharedPreferences(HISTORY_FILE, Context.MODE_PRIVATE)
+        .edit()
+        .putString(HISTORY_KEY, items.joinToString("\n"))
+        .apply()
+}
+
+/** Menaruh pencarian di paling atas daftar terbaru, tanpa duplikat. */
+private fun pushHistory(context: Context, query: String): List<String> {
+    val q = query.trim()
+    val updated = (listOf(q) + loadHistory(context).filterNot { it.equals(q, ignoreCase = true) })
+        .take(HISTORY_MAX)
+    saveHistory(context, updated)
+    return updated
+}
 
 @Composable
 fun SearchScreen(current: Song, onPlay: (Song, List<Song>) -> Unit) {
     val c = AppTheme.colors
     val context = LocalContext.current
+
     var query by rememberSaveable { mutableStateOf("") }
-    var tab by rememberSaveable { mutableStateOf(0) }
-    val recents = remember { mutableStateListOf<RecentSearch>().apply { addAll(defaultRecentSearches) } }
-    val focusManager: FocusManager = LocalFocusManager.current
-
-    var results by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var results by remember { mutableStateOf<List<Song>?>(null) }
     var loading by remember { mutableStateOf(false) }
-    var errorText by remember { mutableStateOf<String?>(null) }
+    var history by remember { mutableStateOf(loadHistory(context)) }
 
-    // Cari ke YouTube Music setiap teks berubah (jeda setengah detik supaya tidak boros).
-    LaunchedEffect(query, tab) {
+    LaunchedEffect(query) {
         val q = query.trim()
-        if (tab != 0 || q.isEmpty()) {
-            results = emptyList()
+        if (q.isBlank()) {
+            results = null
             loading = false
-            errorText = null
             return@LaunchedEffect
         }
-        delay(500)
         loading = true
-        errorText = null
-        try {
-            results = YouTubeMusicRepository.searchSongs(
-                q,
-                songsOnly = AppPrefs.prefs(context).getBoolean("music_only", true),
-            )
-        } catch (e: CancellationException) {
+        delay(450)
+        val musicOnly = AppPrefs.prefs(context).getBoolean("music_only", true)
+        val found = try {
+            YouTubeMusicRepository.searchSongs(q, songsOnly = musicOnly)
+        } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            results = emptyList()
-            errorText = "Gagal memuat: ${e.message ?: e.javaClass.simpleName}"
+            emptyList()
         }
+        // Kalau pengguna sudah mengetik lagi, hasil lama ini dibuang.
+        if (!isActive) return@LaunchedEffect
+        results = found
         loading = false
+        history = pushHistory(context, q)
     }
 
-    val submit: () -> Unit = {
+    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+        ScreenHeader("Cari")
+
+        TextField(
+            value = query,
+            onValueChange = { query = it },
+            singleLine = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            placeholder = { Text("Artis, lagu, atau album", color = c.textSecondary) },
+            leadingIcon = {
+                Icon(Icons.Filled.Search, contentDescription = null, tint = c.textSecondary)
+            },
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = "Hapus teks",
+                        tint = c.textSecondary,
+                        modifier = Modifier.clickable { query = "" },
+                    )
+                }
+            },
+            shape = RoundedCornerShape(14.dp),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = c.textSecondary.copy(alpha = 0.12f),
+                unfocusedContainerColor = c.textSecondary.copy(alpha = 0.12f),
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                focusedTextColor = c.text,
+                unfocusedTextColor = c.text,
+                cursorColor = c.text,
+            ),
+        )
+
         val q = query.trim()
-        if (q.isNotEmpty()) {
-            recents.removeAll { it.title.equals(q, ignoreCase = true) }
-            recents.add(0, RecentSearch(q, "Pencarian", listOf(Color(0xFF7B6CF6), Color(0xFFE040FB))))
-        }
-        focusManager.clearFocus()
-    }
-
-    LazyColumn(
-        Modifier
-            .fillMaxSize()
-            .statusBarsPadding(),
-        contentPadding = PaddingValues(bottom = 200.dp),
-    ) {
-        item(key = "search-bar") {
-            SearchBar(query = query, onQueryChange = { query = it }, onSubmit = submit)
-        }
-        item(key = "search-tabs") {
-            SegmentedTabs(listOf("YouTube", "Library", "Addons"), tab) { tab = it }
-        }
-
-        when {
-            tab == 0 && query.isBlank() -> {
-                item(key = "recent-header") {
-                    SectionHeader(
+        if (q.isBlank()) {
+            // Default kosong: hanya tampilkan riwayat pencarian.
+            if (history.isNotEmpty()) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
                         "Pencarian terbaru",
-                        action = if (recents.isEmpty()) null else "Hapus",
-                        actionColor = c.text,
-                        onActionClick = { recents.clear() },
+                        color = c.text,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        "Hapus",
+                        color = AppleRed,
+                        fontSize = 15.sp,
+                        modifier = Modifier
+                            .clickable {
+                                saveHistory(context, emptyList())
+                                history = emptyList()
+                            }
+                            .padding(8.dp),
                     )
                 }
-                items(recents, key = { it.title }) { entry ->
-                    RecentRow(
-                        item = entry,
-                        onClick = { query = entry.title },
-                        onRemove = { recents.remove(entry) },
-                    )
-                }
-            }
-
-            tab == 0 -> {
-                val message = when {
-                    loading && results.isEmpty() -> "Mencari…"
-                    errorText != null -> errorText
-                    results.isEmpty() -> "Tidak ada hasil untuk \"$query\""
-                    else -> null
-                }
-                if (message != null) {
-                    item(key = "search-message") { EmptyNote(message) }
-                }
-                items(results.size) { index ->
-                    val song = results[index]
-                    Box(Modifier.padding(horizontal = 20.dp)) {
-                        SongRow(
-                            song,
-                            highlighted = song.title == current.title && song.artist == current.artist,
-                        ) { onPlay(song, results) }
-                    }
-                }
-            }
-
-            tab == 1 -> item(key = "library-empty") { EmptyNote("Belum ada musik di Library") }
-
-            else -> item(key = "addons-empty") { EmptyNote("Belum ada addon terpasang") }
-        }
-    }
-}
-
-@Composable
-private fun SearchBar(query: String, onQueryChange: (String) -> Unit, onSubmit: () -> Unit) {
-    val c = AppTheme.colors
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Row(
-            Modifier
-                .weight(1f)
-                .height(56.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(c.surface)
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                Icons.Filled.Search,
-                contentDescription = null,
-                tint = c.textSecondary,
-                modifier = Modifier.size(26.dp),
-            )
-            Spacer(Modifier.width(12.dp))
-            BasicTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                singleLine = true,
-                textStyle = TextStyle(color = c.text, fontSize = 19.sp),
-                cursorBrush = SolidColor(AppleRed),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
-                modifier = Modifier.weight(1f),
-                decorationBox = { innerTextField ->
-                    Box(contentAlignment = Alignment.CenterStart) {
-                        if (query.isEmpty()) {
+                LazyColumn(
+                    Modifier.weight(1f),
+                    contentPadding = PaddingValues(bottom = 200.dp),
+                ) {
+                    items(history) { entry ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { query = entry }
+                                .padding(horizontal = 20.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Filled.Search,
+                                contentDescription = null,
+                                tint = c.textSecondary,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Spacer(Modifier.width(14.dp))
                             Text(
-                                "Artis, Lagu, Lirik, dan Lainnya",
-                                color = c.textSecondary,
-                                fontSize = 19.sp,
+                                entry,
+                                color = c.text,
+                                fontSize = 16.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
                             )
                         }
-                        innerTextField()
                     }
-                },
-            )
-            if (query.isNotEmpty()) {
-                Icon(
-                    Icons.Filled.Close,
-                    contentDescription = "Hapus teks",
-                    tint = c.textSecondary,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .clickable { onQueryChange("") }
-                        .padding(4.dp),
-                )
+                }
+            } else {
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "Ketik untuk mencari lagu, artis, atau album.",
+                        color = c.textSecondary,
+                        fontSize = 15.sp,
+                    )
+                }
             }
-        }
-        Spacer(Modifier.width(12.dp))
-        Avatar(size = 56.dp)
-    }
-}
-
-@Composable
-private fun SegmentedTabs(options: List<String>, selected: Int, onSelect: (Int) -> Unit) {
-    val c = AppTheme.colors
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp)
-            .clip(RoundedCornerShape(22.dp))
-            .background(c.surface)
-            .padding(5.dp),
-    ) {
-        options.forEachIndexed { index, label ->
-            val isSelected = index == selected
-            Box(
-                Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(if (isSelected) c.segmentSelected else Color.Transparent)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onSelect(index) },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    label,
-                    color = if (isSelected) c.segmentSelectedText else c.textSecondary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
+        } else if (loading && results == null) {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else {
+            val list = results.orEmpty()
+            if (list.isEmpty()) {
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        if (loading) "Mencari…" else "Tidak ada hasil untuk \"$q\"",
+                        color = c.textSecondary,
+                        fontSize = 15.sp,
+                    )
+                }
+            } else {
+                LazyColumn(
+                    Modifier.weight(1f),
+                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 200.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    items(list) { song ->
+                        SongRow(song, highlighted = song.url == current.url) {
+                            onPlay(song, list)
+                        }
+                    }
+                }
             }
         }
     }
-}
-
-@Composable
-private fun RecentRow(item: RecentSearch, onClick: () -> Unit, onRemove: () -> Unit) {
-    val c = AppTheme.colors
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Artwork(item.art, Modifier.size(64.dp), corner = 8.dp)
-        Spacer(Modifier.width(16.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                item.title,
-                color = c.text,
-                fontSize = 19.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                item.subtitle,
-                color = c.textSecondary,
-                fontSize = 16.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Icon(
-            Icons.Filled.Close,
-            contentDescription = "Hapus dari riwayat",
-            tint = c.textSecondary,
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .clickable(onClick = onRemove)
-                .padding(10.dp),
-        )
-    }
-}
-
-@Composable
-private fun EmptyNote(text: String) {
-    Text(
-        text,
-        color = AppTheme.colors.textSecondary,
-        fontSize = 16.sp,
-        textAlign = TextAlign.Center,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 48.dp, horizontal = 24.dp),
-    )
 }
