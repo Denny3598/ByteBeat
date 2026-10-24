@@ -6,16 +6,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
@@ -28,9 +30,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,7 +74,7 @@ fun ExploreScreen() {
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             ExploreState.Error("Gagal memuat: ${e.javaClass.simpleName} ${e.message.orEmpty()}")
         }
     }
@@ -111,61 +119,117 @@ fun ExploreScreen() {
                 }
             }
 
-            is ExploreState.Ok -> LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 200.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(s.moods, key = { it.browseId }) { mood ->
-                    MoodCard(mood)
+            is ExploreState.Ok -> {
+                // Dua kartu per baris, sama seperti tampilan BitChord.
+                val rows = s.moods.chunked(2)
+                LazyColumn(
+                    Modifier.weight(1f),
+                    contentPadding = PaddingValues(bottom = 200.dp),
+                ) {
+                    items(
+                        rows,
+                        key = { row -> row.first().let { "${it.browseId}|${it.params.orEmpty()}" } },
+                    ) { row ->
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
+                        ) {
+                            row.forEach { mood -> MoodCard(mood, Modifier.weight(1f)) }
+                            repeat(2 - row.size) { Spacer(Modifier.weight(1f)) }
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-/** Kartu kategori: warna strip di kiri memudar ke cover di kanan. */
+/**
+ * Strip warna di kiri, cover di kanan yang dibuat duotone dari warna strip.
+ * Judul di pojok kiri atas, sama seperti BitChord.
+ */
 @Composable
 private fun MoodCard(mood: ExploreMood, modifier: Modifier = Modifier) {
+    val tone = remember(mood.color) { moodTone(mood.color) }
     Box(
         modifier
-            .fillMaxWidth()
-            .aspectRatio(1.8f)
-            .clip(RoundedCornerShape(20.dp))
-            .background(mood.color),
+            .aspectRatio(1.72f)
+            .clip(RoundedCornerShape(18.dp))
+            .background(tone.stripe),
     ) {
-        if (mood.coverUrl != null) {
-            AsyncImage(
-                model = mood.coverUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.horizontalGradient(
-                            0f to mood.color,
-                            0.42f to mood.color,
-                            0.7f to mood.color.copy(alpha = 0.45f),
-                            1f to Color.Transparent,
-                        ),
-                    ),
-            )
+        Box(
+            Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .fillMaxWidth(0.72f)
+                .background(tone.placeholder),
+        ) {
+            mood.coverUrl?.let { url ->
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    colorFilter = tone.duotone,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
+        // Bayangan gelap di atas supaya judul tetap terbaca di warna pastel.
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.24f),
+                        0.62f to Color.Transparent,
+                    ),
+                ),
+        )
         Text(
             mood.title,
             color = Color.White,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
+            style = TextStyle(
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                shadow = Shadow(Color.Black.copy(alpha = 0.35f), offset = Offset(0f, 1f), blurRadius = 6f),
+            ),
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(14.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
         )
     }
+}
+
+private class MoodTone(val stripe: Color, val placeholder: Color, val duotone: ColorFilter)
+
+private fun moodTone(base: Color): MoodTone {
+    // Warna YouTube sudah pastel; sedikit hitam menjaga supaya tidak menyala di latar gelap.
+    val stripe = lerp(base, Color.Black, 0.08f)
+    val shadow = lerp(base, Color.Black, 0.68f)
+    val highlight = lerp(base, Color.White, 0.32f)
+    return MoodTone(
+        stripe = stripe,
+        placeholder = lerp(shadow, highlight, 0.45f),
+        duotone = duotone(shadow, highlight),
+    )
+}
+
+/** Memetakan kecerahan tiap piksel ke rentang warna shadow sampai highlight. */
+private fun duotone(shadow: Color, highlight: Color): ColorFilter {
+    fun channel(from: Float, to: Float): FloatArray {
+        val span = to - from
+        return floatArrayOf(span * 0.299f, span * 0.587f, span * 0.114f, 0f, from * 255f)
+    }
+    return ColorFilter.colorMatrix(
+        ColorMatrix(
+            channel(shadow.red, highlight.red) +
+                channel(shadow.green, highlight.green) +
+                channel(shadow.blue, highlight.blue) +
+                floatArrayOf(0f, 0f, 0f, 1f, 0f),
+        ),
+    )
 }
