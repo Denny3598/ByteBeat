@@ -23,6 +23,15 @@ data class ExploreMood(
     val coverUrl: String?,
 )
 
+private data class MoodButton(
+    val title: String,
+    val browseId: String,
+    val params: String?,
+    val stripeColor: Long?,
+)
+
+private data class MoodSection(val title: String, val items: List<MoodButton>)
+
 /** Mengambil kategori suasana/genre dan cover-nya dari YouTube Music (tanpa login). */
 object ExploreRepository {
     private const val API = "https://music.youtube.com/youtubei/v1/browse?prettyPrint=false"
@@ -31,7 +40,6 @@ object ExploreRepository {
         "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36"
 
     // callTimeout = batas total satu permintaan, supaya tidak pernah menggantung.
-    // Batas koneksi per host dinaikkan agar cover banyak kategori bisa diambil bersamaan.
     private val http = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
@@ -46,25 +54,96 @@ object ExploreRepository {
     /** Melempar exception kalau halaman utama gagal dimuat, supaya layar bisa menampilkan pesannya. */
     suspend fun moods(): List<ExploreMood> = coroutineScope {
         val root = withContext(Dispatchers.IO) { browse("FEmusic_moods_and_genres", null) }
-        val buttons = mutableListOf<JSONObject>()
-        collect(root, "musicNavigationButtonRenderer", buttons)
+        val buttons = parseButtons(root)
+        buttons.map { m ->
+            async(Dispatchers.IO) {
+                ExploreMood(
+                    title = m.title,
+                    color = colorOf(m.stripeColor, m.title),
+                    browseId = m.browseId,
+                    params = m.params,
+                    coverUrl = coverFor(m.browseId, m.params),
+                )
+            }
+        }.awaitAll()
+    }
 
-        val base = buttons.mapNotNull { b ->
-            val title = textOf(b.optJSONObject("buttonText")) ?: return@mapNotNull null
-            val endpoint = b.optJSONObject("clickCommand")?.optJSONObject("browseEndpoint")
-                ?: return@mapNotNull null
-            val browseId = endpoint.optString("browseId").takeIf { it.isNotBlank() }
-                ?: return@mapNotNull null
-            val params = endpoint.optString("params").takeIf { it.isNotBlank() }
-            val stripe = b.optJSONObject("solid")?.optLong("leftStripeColor", 0L) ?: 0L
-            val color = if (stripe != 0L) Color(stripe.toInt()) else Color(0xFF6B6B6B)
-            ExploreMood(title, color, browseId, params, coverUrl = null)
+    /**
+     * Sama seperti parser BitChord: section dibaca dari gridRenderer, tombol pintasan yang
+     * muncul lagi di section lain dibuang, dan section "For you" dibuang.
+     */
+    private fun parseButtons(root: JSONObject): List<MoodButton> {
+        val contents = root.optJSONObject("contents")
+            ?.optJSONObject("singleColumnBrowseResultsRenderer")
+            ?.optJSONArray("tabs")
+            ?.optJSONObject(0)
+            ?.optJSONObject("tabRenderer")
+            ?.optJSONObject("content")
+            ?.optJSONObject("sectionListRenderer")
+            ?.optJSONArray("contents")
+
+        val sections = mutableListOf<MoodSection>()
+        if (contents != null) {
+            for (i in 0 until contents.length()) {
+                val grid = contents.optJSONObject(i)?.optJSONObject("gridRenderer") ?: continue
+                val title = textOf(
+                    grid.optJSONObject("header")
+                        ?.optJSONObject("gridHeaderRenderer")
+                        ?.optJSONObject("title"),
+                ).orEmpty()
+                val items = grid.optJSONArray("items") ?: continue
+                val buttons = mutableListOf<MoodButton>()
+                for (j in 0 until items.length()) {
+                    val button = items.optJSONObject(j)?.optJSONObject("musicNavigationButtonRenderer")
+                        ?: continue
+                    buttonOf(button)?.let { buttons += it }
+                }
+                if (title.isNotBlank() && buttons.isNotEmpty()) sections += MoodSection(title, buttons)
+            }
         }
 
-        // Ambil cover tiap kategori secara paralel. Kalau satu gagal, kartunya tetap tampil tanpa cover.
-        base.map { m ->
-            async(Dispatchers.IO) { m.copy(coverUrl = coverFor(m.browseId, m.params)) }
-        }.awaitAll()
+        val kept = sections.filterIndexed { index, section ->
+            val later = sections.drop(index + 1)
+                .flatMapTo(HashSet()) { s -> s.items.map { it.browseId to it.params } }
+            val shortcut = section.items.any { (it.browseId to it.params) in later }
+            !shortcut && !section.title.equals("For you", ignoreCase = true)
+        }
+        if (kept.isNotEmpty()) {
+            return kept.flatMap { it.items }.distinctBy { it.browseId to it.params }
+        }
+
+        // Cadangan kalau struktur section berubah: ambil semua tombol, lalu buang yang kembar.
+        val raw = mutableListOf<JSONObject>()
+        collect(root, "musicNavigationButtonRenderer", raw)
+        return raw.mapNotNull { buttonOf(it) }.distinctBy { it.browseId to it.params }
+    }
+
+    private fun buttonOf(button: JSONObject): MoodButton? {
+        val endpoint = button.optJSONObject("clickCommand")?.optJSONObject("browseEndpoint")
+            ?: button.optJSONObject("navigationEndpoint")?.optJSONObject("browseEndpoint")
+            ?: return null
+        val browseId = endpoint.optString("browseId").takeIf { it.isNotBlank() } ?: return null
+        val title = textOf(button.optJSONObject("buttonText"))?.takeIf { it.isNotBlank() } ?: return null
+        val params = endpoint.optString("params").takeIf { it.isNotBlank() }
+        val stripe = button.optJSONObject("solid")
+            ?.optLong("leftStripeColor", 0L)
+            ?.takeIf { it != 0L }
+        return MoodButton(title, browseId, params, stripe)
+    }
+
+    /** Warna strip dari YouTube Music; kalau tidak ada, pakai warna cadangan yang kalem. */
+    private fun colorOf(stripe: Long?, title: String): Color {
+        if (stripe != null) return Color(stripe.toInt())
+        return when ((title.hashCode() and Int.MAX_VALUE) % 8) {
+            0 -> Color(0xFFCC6A55)
+            1 -> Color(0xFFC07A92)
+            2 -> Color(0xFF9C8AC0)
+            3 -> Color(0xFF8090C8)
+            4 -> Color(0xFFD0A060)
+            5 -> Color(0xFF6A88B0)
+            6 -> Color(0xFF7AAED0)
+            else -> Color(0xFF86B890)
+        }
     }
 
     /** Playlist pertama di kategori dipakai sebagai cover. */
