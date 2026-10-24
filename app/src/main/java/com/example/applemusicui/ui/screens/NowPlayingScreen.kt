@@ -123,26 +123,26 @@ fun NowPlayingScreen(
     }
 
     // Posisi sheet dalam piksel: screenHeightPx = tersembunyi di bawah, 0f = terbuka penuh.
-    val sheet = remember { Animatable(screenHeightPx) }
+    val dragY = remember { Animatable(screenHeightPx) }
 
     LaunchedEffect(Unit) {
-        sheet.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
+        dragY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
     }
 
     fun close() {
         scope.launch {
-            sheet.animateTo(screenHeightPx, tween(durationMillis = 300, easing = FastOutSlowInEasing))
+            dragY.animateTo(screenHeightPx, tween(durationMillis = 300, easing = FastOutSlowInEasing))
             onClose()
         }
     }
 
     fun settle() {
         scope.launch {
-            sheet.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium))
+            dragY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium))
         }
     }
 
-    val p = 1f - (sheet.value / screenHeightPx.coerceAtLeast(1f)).coerceIn(0f, 1f)
+    val p = 1f - (dragY.value / screenHeightPx.coerceAtLeast(1f)).coerceIn(0f, 1f)
     val titleAlpha = ((p - 0.2f) / 0.6f).coerceIn(0f, 1f)
     val controlsAlpha = ((p - 0.4f) / 0.6f).coerceIn(0f, 1f)
 
@@ -159,17 +159,17 @@ fun NowPlayingScreen(
         Box(
             Modifier
                 .fillMaxSize()
-                .graphicsLayer { translationY = sheet.value }
+                .graphicsLayer { translationY = dragY.value }
                 .pointerInput(Unit) {
                     detectVerticalDragGestures(
                         onDragEnd = {
-                            if (sheet.value > screenHeightPx * 0.3f) close() else settle()
+                            if (dragY.value > screenHeightPx * 0.3f) close() else settle()
                         },
                         onDragCancel = { settle() },
                         onVerticalDrag = { change, dragAmount ->
                             change.consume()
                             scope.launch {
-                                sheet.snapTo((sheet.value + dragAmount).coerceAtLeast(0f))
+                                dragY.snapTo((dragY.value + dragAmount).coerceAtLeast(0f))
                             }
                         },
                     )
