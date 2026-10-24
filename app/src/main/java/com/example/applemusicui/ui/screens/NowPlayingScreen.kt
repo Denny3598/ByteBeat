@@ -28,9 +28,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.MoreHoriz
@@ -50,7 +50,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -123,7 +122,7 @@ fun NowPlayingScreen(
 
     // Cover membesar saat diputar dan mengecil saat dijeda.
     val coverScale by animateFloatAsState(
-        targetValue = if (controller.isPlaying) 1f else 0.82f,
+        targetValue = if (controller.isPlaying) 1f else 0.9f,
         animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow),
         label = "coverScale",
     )
@@ -164,8 +163,8 @@ fun NowPlayingScreen(
             .fillMaxSize()
             .background(Color.Black.copy(alpha = p)),
     ) {
-        // Latar: cover yang di-blur. Di Android 12 ke bawah blur tidak aktif,
-        // jadi lapisan gelap di bawahnya tetap menjaga keterbacaan.
+        // Latar: cover yang di-blur di seluruh layar. Di Android 12 ke bawah blur tidak aktif,
+        // jadi lapisan gelap di atasnya tetap menjaga keterbacaan.
         Box(
             Modifier
                 .fillMaxSize()
@@ -185,39 +184,15 @@ fun NowPlayingScreen(
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            Color.Black.copy(alpha = 0.35f * p),
+                            Color.Black.copy(alpha = 0.25f * p),
                             Color.Black.copy(alpha = 0.85f * p),
                         ),
                     ),
                 ),
         )
 
-        Column(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding(),
-        ) {
-            // Gagang kecil di atas, ketuk untuk menutup
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { dismiss() }
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(
-                    Modifier
-                        .width(40.dp)
-                        .height(5.dp)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(Color.White.copy(alpha = 0.5f)),
-                )
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            // Cover selebar layar
+        Column(Modifier.fillMaxSize()) {
+            // Cover edge-to-edge sampai atas layar, di belakang status bar.
             Box(coverModifier) {
                 Artwork(
                     colors = song.art,
@@ -227,12 +202,11 @@ fun NowPlayingScreen(
                 )
             }
 
-            Spacer(Modifier.height(24.dp))
-
             // Judul, progres, dan waktu (muncul lebih dulu)
             Column(
                 Modifier
-                    .padding(horizontal = 24.dp)
+                    .weight(1f)
+                    .padding(horizontal = 24.dp, vertical = 20.dp)
                     .graphicsLayer {
                         alpha = titleAlpha
                         translationY = (1f - titleAlpha) * 30f
@@ -243,7 +217,7 @@ fun NowPlayingScreen(
                         Text(
                             song.title,
                             color = Fg,
-                            fontSize = 22.sp,
+                            fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -251,7 +225,7 @@ fun NowPlayingScreen(
                         Text(
                             song.artist,
                             color = FgDim,
-                            fontSize = 17.sp,
+                            fontSize = 18.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -262,7 +236,7 @@ fun NowPlayingScreen(
                     CircleIcon(Icons.Filled.MoreHoriz, "Opsi")
                 }
 
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(18.dp))
 
                 SlimSlider(
                     value = shown,
@@ -295,12 +269,11 @@ fun NowPlayingScreen(
                 }
             }
 
-            Spacer(Modifier.weight(1f))
-
             // Kontrol, volume, dan aksi bawah (muncul sedikit setelah judul)
             Column(
                 Modifier
-                    .padding(horizontal = 24.dp)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
                     .graphicsLayer {
                         alpha = controlsAlpha
                         translationY = (1f - controlsAlpha) * 30f
@@ -376,7 +349,7 @@ fun NowPlayingScreen(
                     )
                 }
 
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(20.dp))
 
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -405,7 +378,7 @@ fun NowPlayingScreen(
                     )
                 }
 
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(20.dp))
 
                 Row(
                     Modifier.fillMaxWidth(),
@@ -417,8 +390,25 @@ fun NowPlayingScreen(
                     BottomAction(Icons.Filled.QueueMusic, "Antrean")
                 }
             }
+        }
 
-            Spacer(Modifier.height(16.dp))
+        // Gagang di atas, di area status bar, ketuk untuk menutup.
+        Box(
+            Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .fillMaxWidth()
+                .clickable { dismiss() }
+                .padding(vertical = 10.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                Modifier
+                    .width(40.dp)
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color.White.copy(alpha = 0.6f)),
+            )
         }
     }
 }
