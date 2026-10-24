@@ -61,8 +61,7 @@ fun SettingsScreen(
     onThemeModeChange: (ThemeMode) -> Unit,
     loggedIn: Boolean,
     onBack: () -> Unit,
-    onLogin: () -> Unit,
-    onLogout: () -> Unit,
+    onOpenAccount: () -> Unit,
 ) {
     val c = AppTheme.colors
     val prefs = AppPrefs.prefs(LocalContext.current)
@@ -105,13 +104,9 @@ fun SettingsScreen(
         SettingsCard {
             SettingsRow(
                 icon = Icons.Filled.AccountCircle,
-                title = if (loggedIn) "Akun YouTube terhubung" else "Login ke YouTube Music",
-                subtitle = if (loggedIn) {
-                    "Ketuk untuk keluar dari akun"
-                } else {
-                    "Masuk untuk memakai playlist dan riwayatmu"
-                },
-                onClick = if (loggedIn) onLogout else onLogin,
+                title = "Akun",
+                value = if (loggedIn) "Terhubung" else "Belum masuk",
+                onClick = onOpenAccount,
             )
         }
 
