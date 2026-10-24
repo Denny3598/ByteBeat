@@ -53,6 +53,7 @@ import com.example.applemusicui.ui.screens.DetailPageScreen
 import com.example.applemusicui.ui.screens.ExploreScreen
 import com.example.applemusicui.ui.screens.LibraryScreen
 import com.example.applemusicui.ui.screens.ListenNowScreen
+import com.example.applemusicui.ui.screens.AboutScreen
 import com.example.applemusicui.ui.screens.AccountScreen
 import com.example.applemusicui.ui.screens.LoginScreen
 import com.example.applemusicui.ui.screens.NowPlayingScreen
@@ -72,6 +73,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
     var showAvatarMenu by rememberSaveable { mutableStateOf(false) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showAccount by rememberSaveable { mutableStateOf(false) }
+    var showAbout by rememberSaveable { mutableStateOf(false) }
     var showLogin by rememberSaveable { mutableStateOf(false) }
     var loggedIn by remember { mutableStateOf(AppPrefs.isLoggedIn()) }
 
@@ -90,6 +92,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
     BackHandler(enabled = showAvatarMenu) { showAvatarMenu = false }
     BackHandler(enabled = showSettings) { showSettings = false }
     BackHandler(enabled = showAccount) { showAccount = false }
+    BackHandler(enabled = showAbout) { showAbout = false }
     BackHandler(enabled = showLogin) { showLogin = false }
     BackHandler(enabled = pages.isNotEmpty()) { closePage() }
 
@@ -201,7 +204,12 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
                     loggedIn = loggedIn,
                     onBack = { showSettings = false },
                     onOpenAccount = { showAccount = true },
+                    onOpenAbout = { showAbout = true },
                 )
+            }
+
+            if (showAbout) {
+                AboutScreen(onBack = { showAbout = false })
             }
 
             if (showAccount) {
