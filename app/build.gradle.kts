@@ -14,6 +14,8 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+        // SHA commit saat build dibuat (diisi otomatis oleh GitHub Actions). Dipakai untuk cek pembaruan.
+        buildConfigField("String", "BUILD_SHA", "\"${System.getenv("GITHUB_SHA") ?: "local"}\"")
     }
 
     // Kunci tetap dari secret GitHub. Hanya aktif kalau KEYSTORE_PATH diisi oleh workflow.
@@ -52,6 +54,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
