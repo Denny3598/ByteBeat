@@ -76,6 +76,22 @@ private enum class LibrarySection(val label: String, val browseId: String) {
     Podcast("Podcast", "FEmusic_library_non_music_audio_list"),
 }
 
+/** Data pustaka yang sudah dimuat. Disimpan selama aplikasi hidup, supaya Pustaka langsung tampil tanpa menunggu. */
+private var cachedSections: Map<LibrarySection, List<LibraryItem>>? = null
+
+/** Memuat ulang semua rak pustaka ke cache. Dipanggil saat aplikasi dibuka dan saat Pustaka dibuka. */
+suspend fun refreshLibraryCache() {
+    if (!AppPrefs.isLoggedIn()) return
+    val fresh = loadSections()
+    // Kalau semua gagal (misalnya tidak ada internet), data lama tetap dipakai.
+    if (fresh.values.any { it.isNotEmpty() }) cachedSections = fresh
+}
+
+/** Dipanggil saat logout, supaya pustaka akun sebelumnya tidak tampil lagi. */
+fun clearLibraryCache() {
+    cachedSections = null
+}
+
 private suspend fun loadSections(): Map<LibrarySection, List<LibraryItem>> = coroutineScope {
     LibrarySection.entries
         .map { section ->
@@ -95,14 +111,15 @@ fun LibraryScreen(
     val scope = rememberCoroutineScope()
     val loggedIn = AppPrefs.isLoggedIn()
 
-    var sections by remember { mutableStateOf<Map<LibrarySection, List<LibraryItem>>?>(null) }
+    var sections by remember { mutableStateOf(cachedSections) }
     // null = tab "Semua" (tumpukan rak dengan "Lihat semua").
     var selected by remember { mutableStateOf<LibrarySection?>(null) }
     var busyId by remember { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(loggedIn) {
-        sections = if (loggedIn) loadSections() else emptyMap()
+        refreshLibraryCache()
+        sections = cachedSections ?: emptyMap()
     }
 
     // Tombol Back menutup grid "Lihat semua" dulu, baru keluar dari layar.
