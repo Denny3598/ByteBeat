@@ -77,6 +77,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.components.Artwork
+import com.example.applemusicui.ui.components.SongMenuHost
+import com.example.applemusicui.ui.components.SongMenuStyle
 import com.example.applemusicui.ui.playback.PlaybackController
 import com.example.applemusicui.ui.theme.AppleRed
 import kotlin.math.roundToInt
@@ -108,6 +110,7 @@ fun NowPlayingScreen(
     var scrub by remember { mutableStateOf<Float?>(null) }
     var shuffle by rememberSaveable { mutableStateOf(false) }
     var repeat by rememberSaveable { mutableStateOf(false) }
+    var menu by remember { mutableStateOf<SongMenuStyle?>(null) }
 
     // Posisi sheet dalam piksel: screenHeightPx = tersembunyi di bawah, 0f = terbuka penuh.
     val sheet = remember { Animatable(screenHeightPx) }
@@ -203,7 +206,6 @@ fun NowPlayingScreen(
                     Modifier
                         .fillMaxWidth()
                         .aspectRatio(1f)
-                        .statusBarsPadding()
                         .graphicsLayer {
                             compositingStrategy = CompositingStrategy.Offscreen
                             scaleX = coverScale
@@ -231,8 +233,7 @@ fun NowPlayingScreen(
                 // Judul, progres, dan waktu (muncul lebih dulu)
                 Column(
                     Modifier
-                        .weight(1f)
-                        .padding(horizontal = 24.dp, vertical = 20.dp)
+                        .padding(horizontal = 24.dp, vertical = 12.dp)
                         .graphicsLayer {
                             alpha = titleAlpha
                             translationY = (1f - titleAlpha) * 30f
@@ -259,7 +260,7 @@ fun NowPlayingScreen(
                         Spacer(Modifier.width(12.dp))
                         CircleIcon(Icons.Filled.FavoriteBorder, "Suka")
                         Spacer(Modifier.width(10.dp))
-                        CircleIcon(Icons.Filled.MoreHoriz, "Opsi")
+                        CircleIcon(Icons.Filled.MoreHoriz, "Opsi") { menu = SongMenuStyle.Sheet }
                     }
 
                     Spacer(Modifier.height(18.dp))
@@ -416,6 +417,8 @@ fun NowPlayingScreen(
                         BottomAction(Icons.Filled.QueueMusic, "Antrean")
                     }
                 }
+
+                Spacer(Modifier.weight(1f))
             }
 
             // Gagang di atas, di area status bar. Ketuk untuk menutup, atau tarik ke bawah.
@@ -436,6 +439,11 @@ fun NowPlayingScreen(
                         .background(Color.White.copy(alpha = 0.6f)),
                 )
             }
+        }
+
+        // Menu aksi lagu saat titik tiga ditekan.
+        menu?.let { style ->
+            SongMenuHost(song = song, style = style, onDismiss = { menu = null })
         }
     }
 }
@@ -498,12 +506,13 @@ private fun SlimSlider(
 }
 
 @Composable
-private fun CircleIcon(icon: ImageVector, description: String) {
+private fun CircleIcon(icon: ImageVector, description: String, onClick: () -> Unit = {}) {
     Box(
         Modifier
             .size(40.dp)
             .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.18f)),
+            .background(Color.White.copy(alpha = 0.18f))
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = description, tint = Fg, modifier = Modifier.size(22.dp))
