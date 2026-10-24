@@ -53,11 +53,12 @@ object DetailRepository {
         val subtitle = textOf(subtitleObj).orEmpty()
         val artist = artistRunIn(subtitleObj)
         val thumb = header?.let { thumbUnder(it) }
-        val songs = songRows(root).mapNotNull { songOf(it, artist?.first.orEmpty(), thumb) }
+        val songs = songRows(root).mapNotNull { songOf(it, artist?.first.orEmpty()) }
         AlbumPage(
             title = title,
             subtitle = subtitle,
-            thumbnail = thumb,
+            // Playlist otomatis (mis. Musik yang Disukai) sering tidak punya cover: pakai lagu pertama.
+            thumbnail = thumb ?: songs.firstOrNull()?.thumbnail,
             artistName = artist?.first.orEmpty(),
             artistBrowseId = artist?.second,
             songs = songs,
@@ -71,7 +72,7 @@ object DetailRepository {
         val description = textOf(header?.optJSONObject("description"))?.takeIf { it.isNotBlank() }
         val thumb = header?.let { thumbUnder(it) }
         val top = songRows(root)
-            .mapNotNull { songOf(it, name, null) }
+            .mapNotNull { songOf(it, name) }
             .distinctBy { it.url }
         val twoRows = mutableListOf<JSONObject>()
         collect(root, "musicTwoRowItemRenderer", twoRows)
@@ -97,7 +98,7 @@ object DetailRepository {
         return rows
     }
 
-    private fun songOf(r: JSONObject, artistName: String, thumb: String?): Song? {
+    private fun songOf(r: JSONObject, artistName: String): Song? {
         val videoId = r.optJSONObject("playlistItemData")
             ?.optString("videoId")
             ?.takeIf { it.isNotBlank() }
@@ -109,7 +110,8 @@ object DetailRepository {
             artist = artist,
             art = listOf(AppleRed, Color(0xFF333333)),
             url = "https://www.youtube.com/watch?v=$videoId",
-            thumbnail = thumb ?: thumbUnder(r),
+            // Cover tiap lagu sendiri (ukuran sedang, supaya ratusan baris tidak memenuhi memori).
+            thumbnail = cardThumb(thumbUnder(r)),
         )
     }
 
