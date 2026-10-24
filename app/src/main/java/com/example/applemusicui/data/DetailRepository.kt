@@ -31,6 +31,22 @@ data class ArtistPage(
     val albums: List<LibraryItem>,
 )
 
+/** Satu episode podcast: lagu yang bisa diputar plus tanggal, durasi, dan deskripsinya. */
+data class PodcastEpisode(
+    val song: Song,
+    val dateText: String?,
+    val durationText: String?,
+    val description: String?,
+)
+
+data class PodcastDetail(
+    val title: String,
+    val author: String,
+    val thumbnail: String?,
+    val description: String?,
+    val episodes: List<PodcastEpisode>,
+)
+
 /** Halaman album, playlist, dan artis dari YouTube Music. Tidak perlu login. */
 object DetailRepository {
     private const val API = "https://music.youtube.com/youtubei/v1/browse?prettyPrint=false"
@@ -88,6 +104,63 @@ object DetailRepository {
             topSongs = top,
             albums = albums,
         )
+    }
+
+    /**
+     * Halaman show podcast, mengikuti ArchiveTune: header (judul, nama show, deskripsi)
+     * dan daftar episode dari baris musicMultiRowListItemRenderer. Episode diputar lewat videoId-nya.
+     */
+    suspend fun podcast(browseId: String): PodcastDetail = withContext(Dispatchers.IO) {
+        val root = browse(browseId)
+        val header = firstOf(root, "musicResponsiveHeaderRenderer", "musicDetailHeaderRenderer")
+        val title = textOf(header?.optJSONObject("title")).orEmpty()
+        val author = (textOf(header?.optJSONObject("straplineTextOne")) ?: textOf(header?.optJSONObject("subtitle")))
+            .orEmpty()
+        val description = firstOf(root, "musicDescriptionShelfRenderer")
+            ?.let { textOf(it.optJSONObject("description")) }
+        val rows = mutableListOf<JSONObject>()
+        collect(root, "musicMultiRowListItemRenderer", rows)
+        val episodes = rows.mapNotNull { episodeOf(it, title) }.distinctBy { it.song.url }
+        PodcastDetail(
+            title = title,
+            author = author,
+            thumbnail = header?.let { thumbUnder(it) } ?: episodes.firstOrNull()?.song?.thumbnail,
+            description = description,
+            episodes = episodes,
+        )
+    }
+
+    private fun episodeOf(r: JSONObject, showName: String): PodcastEpisode? {
+        val videoId = firstOf(r, "watchEndpoint")
+            ?.optString("videoId")
+            ?.takeIf { it.isNotBlank() }
+            ?: return null
+        val title = textOf(r.optJSONObject("title")) ?: return null
+        val durationObj = firstOf(r, "musicPlaybackProgressRenderer")?.optJSONObject("durationText")
+        return PodcastEpisode(
+            song = Song(
+                title = title,
+                artist = showName,
+                art = listOf(AppleRed, Color(0xFF333333)),
+                url = "https://www.youtube.com/watch?v=$videoId",
+                thumbnail = cardThumb(thumbUnder(r)),
+            ),
+            dateText = episodeDate(r.optJSONObject("subtitle")?.optJSONArray("runs"), showName),
+            durationText = textOf(durationObj),
+            description = textOf(r.optJSONObject("description")),
+        )
+    }
+
+    /** Teks tanggal dari subtitle episode: bagian yang bukan nama show dan bukan durasi. */
+    private fun episodeDate(runs: JSONArray?, showName: String): String? {
+        if (runs == null) return null
+        for (i in 0 until runs.length()) {
+            val text = runs.optJSONObject(i)?.optString("text")?.trim().orEmpty()
+            if (text.isNotBlank() && text != showName && text.any(Char::isLetterOrDigit) && !text.contains(':')) {
+                return text
+            }
+        }
+        return null
     }
 
     /** Baris lagu hanya diambil dari shelf utama, supaya rekomendasi di bawah tidak ikut masuk. */

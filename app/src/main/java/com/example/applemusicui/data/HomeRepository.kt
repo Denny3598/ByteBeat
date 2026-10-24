@@ -153,21 +153,23 @@ object HomeRepository {
         return if (items.isEmpty()) null else HomeShelf(title, items.distinctBy { it.videoId ?: it.browseId })
     }
 
+    /** videoId dari tombol putar di atas cover. Dipakai juga untuk episode podcast yang tidak punya tautan lagu. */
+    private fun overlayVideoId(r: JSONObject): String? = (r.optJSONObject("thumbnailOverlay") ?: r.optJSONObject("overlay"))
+        ?.optJSONObject("musicItemThumbnailOverlayRenderer")
+        ?.optJSONObject("content")
+        ?.optJSONObject("musicPlayButtonRenderer")
+        ?.optJSONObject("playNavigationEndpoint")
+        ?.optJSONObject("watchEndpoint")
+        ?.optString("videoId")
+        ?.takeIf { it.isNotBlank() }
+
     private fun parseItem(r: JSONObject): HomeCardItem? {
         val title = textOf(r.optJSONObject("title")) ?: return null
         val nav = r.optJSONObject("navigationEndpoint")
-        val overlayVideo = (r.optJSONObject("thumbnailOverlay") ?: r.optJSONObject("overlay"))
-            ?.optJSONObject("musicItemThumbnailOverlayRenderer")
-            ?.optJSONObject("content")
-            ?.optJSONObject("musicPlayButtonRenderer")
-            ?.optJSONObject("playNavigationEndpoint")
-            ?.optJSONObject("watchEndpoint")
-            ?.optString("videoId")
-            ?.takeIf { it.isNotBlank() }
         val videoId = nav?.optJSONObject("watchEndpoint")
             ?.optString("videoId")
             ?.takeIf { it.isNotBlank() }
-            ?: overlayVideo
+            ?: overlayVideoId(r)
         val browseId = nav?.optJSONObject("browseEndpoint")
             ?.optString("browseId")
             ?.takeIf { it.isNotBlank() }
@@ -184,9 +186,15 @@ object HomeRepository {
     /** Baris lagu gaya daftar (dipakai rak "Recents"). */
     private fun parseResponsive(r: JSONObject): HomeCardItem? {
         val title = flexText(r, 0) ?: return null
+        // Episode podcast biasanya tidak punya playlistItemData, jadi videoId diambil dari tautan tonton atau tombol putar.
         val videoId = r.optJSONObject("playlistItemData")
             ?.optString("videoId")
             ?.takeIf { it.isNotBlank() }
+            ?: r.optJSONObject("navigationEndpoint")
+                ?.optJSONObject("watchEndpoint")
+                ?.optString("videoId")
+                ?.takeIf { it.isNotBlank() }
+            ?: overlayVideoId(r)
         val browseId = r.optJSONObject("navigationEndpoint")
             ?.optJSONObject("browseEndpoint")
             ?.optString("browseId")
