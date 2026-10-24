@@ -20,6 +20,14 @@ fun hdThumb(url: String?): String? {
         .replace(Regex("=s\\d+"), "=s1200")
 }
 
+/** Cover untuk kartu daftar di beranda: cukup tajam, tapi tidak memenuhi memori seperti 1200px. */
+fun cardThumb(url: String?): String? {
+    if (url.isNullOrBlank()) return null
+    return url
+        .replace(Regex("=w\\d+-h\\d+"), "=w544-h544")
+        .replace(Regex("=s\\d+"), "=s544")
+}
+
 /** Satu kartu di beranda: lagu (punya videoId) atau album/playlist (punya browseId). */
 data class HomeCardItem(
     val title: String,
@@ -237,7 +245,7 @@ object HomeRepository {
             .takeIf { it.isNotBlank() }
     }
 
-    private fun thumbOf(r: JSONObject): String? = hdThumb(rawThumb(r))
+    private fun thumbOf(r: JSONObject): String? = cardThumb(rawThumb(r))
 
     private fun rawThumb(r: JSONObject): String? {
         val arr = r.optJSONObject("thumbnailRenderer")

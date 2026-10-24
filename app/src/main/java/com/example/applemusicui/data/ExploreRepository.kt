@@ -5,6 +5,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -51,21 +54,21 @@ object ExploreRepository {
         }
     private val jsonType = "application/json; charset=utf-8".toMediaType()
 
-    /** Melempar exception kalau halaman utama gagal dimuat, supaya layar bisa menampilkan pesannya. */
-    suspend fun moods(): List<ExploreMood> = coroutineScope {
-        val root = withContext(Dispatchers.IO) { browse("FEmusic_moods_and_genres", null) }
-        val buttons = parseButtons(root)
-        buttons.map { m ->
-            async(Dispatchers.IO) {
-                ExploreMood(
-                    title = m.title,
-                    color = colorOf(m.stripeColor, m.title),
-                    browseId = m.browseId,
-                    params = m.params,
-                    coverUrl = coverFor(m.browseId, m.params),
-                )
-            }
-        }.awaitAll()
+    /**
+     * Daftar kategori saja, tanpa menunggu cover. Cover diambil per kartu lewat [coverFor],
+     * sehingga layar langsung tampil. Melempar exception kalau halaman utama gagal dimuat.
+     */
+    suspend fun moods(): List<ExploreMood> = withContext(Dispatchers.IO) {
+        val root = browse("FEmusic_moods_and_genres", null)
+        parseButtons(root).map { m ->
+            ExploreMood(
+                title = m.title,
+                color = colorOf(m.stripeColor, m.title),
+                browseId = m.browseId,
+                params = m.params,
+                coverUrl = null,
+            )
+        }
     }
 
     /**
@@ -146,15 +149,26 @@ object ExploreRepository {
         }
     }
 
-    /** Playlist pertama di kategori dipakai sebagai cover. */
-    private fun coverFor(browseId: String, params: String?): String? = try {
-        val root = browse(browseId, params)
-        val items = mutableListOf<JSONObject>()
-        collect(root, "musicTwoRowItemRenderer", items)
-        items.firstNotNullOfOrNull { thumbOf(it) }
-    } catch (e: Exception) {
-        null
+    /**
+     * Cover satu kategori: playlist pertama di kategori dipakai sebagai cover.
+     * Dibatasi 3 permintaan sekaligus, supaya respons JSON besar tidak menumpuk di memori.
+     */
+    suspend fun coverFor(browseId: String, params: String?): String? = coverLimit.withPermit {
+        withContext(Dispatchers.IO) {
+            try {
+                val root = browse(browseId, params)
+                val items = mutableListOf<JSONObject>()
+                collect(root, "musicTwoRowItemRenderer", items)
+                items.firstNotNullOfOrNull { thumbOf(it) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            }
+        }
     }
+
+    private val coverLimit = Semaphore(3)
 
     private fun browse(browseId: String, params: String?): JSONObject {
         val client = JSONObject()
