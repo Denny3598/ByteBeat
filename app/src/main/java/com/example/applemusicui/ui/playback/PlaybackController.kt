@@ -89,9 +89,10 @@ class PlaybackController(context: Context) {
         loading = true
         loadJob = scope.launch {
             try {
-                val url = StreamResolver.audioUrl(song.url)
+                val resolved = StreamResolver.audio(song.url)
                 val item = MediaItem.Builder()
-                    .setUri(url)
+                    .setUri(resolved.url)
+                    .setMimeType(resolved.mimeType)
                     .setMediaMetadata(
                         MediaMetadata.Builder()
                             .setTitle(song.title)
@@ -112,6 +113,29 @@ class PlaybackController(context: Context) {
                 loading = false
             }
         }
+    }
+
+    /** Lagu ini diputar setelah lagu yang sedang berjalan. */
+    fun playNext(song: Song) {
+        if (current == null) {
+            play(song)
+            return
+        }
+        val index = queue.indexOf(current)
+        queue = if (index < 0) {
+            queue + song
+        } else {
+            queue.toMutableList().apply { add(index + 1, song) }
+        }
+    }
+
+    /** Lagu ini ditambahkan di paling akhir antrean. */
+    fun addToQueue(song: Song) {
+        if (current == null) {
+            play(song)
+            return
+        }
+        queue = queue + song
     }
 
     fun togglePlay() {
