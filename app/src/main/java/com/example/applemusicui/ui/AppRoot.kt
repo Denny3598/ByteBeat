@@ -46,6 +46,7 @@ import com.example.applemusicui.data.DummyData
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.components.AppTab
 import com.example.applemusicui.ui.components.LocalOnAvatarClick
+import com.example.applemusicui.ui.components.LocalOpenPage
 import com.example.applemusicui.ui.components.LocalPlaybackController
 import com.example.applemusicui.ui.components.MiniPlayer
 import com.example.applemusicui.ui.components.PillTabBar
@@ -119,6 +120,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
     CompositionLocalProvider(
         LocalOnAvatarClick provides { showAvatarMenu = true },
         LocalPlaybackController provides controller,
+        LocalOpenPage provides openPage,
     ) {
         Box(
             Modifier
