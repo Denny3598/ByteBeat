@@ -21,6 +21,8 @@ data class AlbumPage(
     val artistName: String,
     val artistBrowseId: String?,
     val songs: List<Song>,
+    /** Episode podcast, kalau halaman ini berisi episode (misalnya "Episode Baru"). */
+    val episodes: List<PodcastEpisode> = emptyList(),
 )
 
 data class ArtistPage(
@@ -69,7 +71,15 @@ object DetailRepository {
         val subtitle = textOf(subtitleObj).orEmpty()
         val artist = artistRunIn(subtitleObj)
         val thumb = header?.let { thumbUnder(it) }
-        val songs = songRows(root).mapNotNull { songOf(it, artist?.first.orEmpty()) }
+        // Halaman berisi episode podcast (misalnya "Episode Baru") memakai baris episode, bukan baris lagu.
+        val episodeRows = mutableListOf<JSONObject>()
+        collect(root, "musicMultiRowListItemRenderer", episodeRows)
+        val episodes = episodeRows.mapNotNull { episodeOf(it, "") }.distinctBy { it.song.url }
+        val songs = if (episodes.isNotEmpty()) {
+            episodes.map { it.song }
+        } else {
+            songRows(root).mapNotNull { songOf(it, artist?.first.orEmpty()) }
+        }
         AlbumPage(
             title = title,
             subtitle = subtitle,
@@ -78,6 +88,7 @@ object DetailRepository {
             artistName = artist?.first.orEmpty(),
             artistBrowseId = artist?.second,
             songs = songs,
+            episodes = episodes,
         )
     }
 
@@ -137,15 +148,19 @@ object DetailRepository {
             ?: return null
         val title = textOf(r.optJSONObject("title")) ?: return null
         val durationObj = firstOf(r, "musicPlaybackProgressRenderer")?.optJSONObject("durationText")
+        // Kalau nama show tidak diketahui (halaman campuran), ambil dari teks pertama subtitle episode.
+        val show = showName.ifBlank {
+            r.optJSONObject("subtitle")?.optJSONArray("runs")?.optJSONObject(0)?.optString("text").orEmpty()
+        }
         return PodcastEpisode(
             song = Song(
                 title = title,
-                artist = showName,
+                artist = show,
                 art = listOf(AppleRed, Color(0xFF333333)),
                 url = "https://www.youtube.com/watch?v=$videoId",
                 thumbnail = cardThumb(thumbUnder(r)),
             ),
-            dateText = episodeDate(r.optJSONObject("subtitle")?.optJSONArray("runs"), showName),
+            dateText = episodeDate(r.optJSONObject("subtitle")?.optJSONArray("runs"), show),
             durationText = textOf(durationObj),
             description = textOf(r.optJSONObject("description")),
         )
