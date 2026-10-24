@@ -84,7 +84,10 @@ private suspend fun loadSections(): Map<LibrarySection, List<LibraryItem>> = cor
 }
 
 @Composable
-fun LibraryScreen(onPlay: (Song, List<Song>) -> Unit = { _, _ -> }) {
+fun LibraryScreen(
+    onPlay: (Song, List<Song>) -> Unit = { _, _ -> },
+    onOpenPage: (String) -> Unit = {},
+) {
     val c = AppTheme.colors
     val scope = rememberCoroutineScope()
     val loggedIn = AppPrefs.isLoggedIn()
@@ -103,6 +106,11 @@ fun LibraryScreen(onPlay: (Song, List<Song>) -> Unit = { _, _ -> }) {
     BackHandler(enabled = selected != null) { selected = null }
 
     fun open(item: LibraryItem) {
+        // Album, playlist, dan artis dibuka halamannya. Lagu yang disukai langsung diputar.
+        if (item.browseId != LIKED_ID) {
+            onOpenPage(item.browseId)
+            return
+        }
         if (busyId != null) return
         busyId = item.browseId
         message = null
