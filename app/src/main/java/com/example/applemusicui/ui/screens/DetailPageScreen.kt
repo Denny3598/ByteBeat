@@ -20,14 +20,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -44,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -55,6 +58,7 @@ import com.example.applemusicui.data.DetailRepository
 import com.example.applemusicui.data.LibraryItem
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.components.Artwork
+import com.example.applemusicui.ui.components.rememberCoverTint
 import com.example.applemusicui.ui.theme.AppTheme
 import com.example.applemusicui.ui.theme.AppleRed
 import kotlinx.coroutines.CancellationException
@@ -64,6 +68,21 @@ private sealed interface DetailState {
     data class Error(val message: String) : DetailState
     data class Album(val page: AlbumPage) : DetailState
     data class Artist(val page: ArtistPage) : DetailState
+}
+
+/** Pilihan urutan lagu di halaman album dan playlist. */
+private enum class TrackSort(val label: String) {
+    Original("Urutan asli"),
+    TitleAsc("Judul A–Z"),
+    TitleDesc("Judul Z–A"),
+    ArtistAsc("Artis A–Z");
+
+    fun apply(list: List<Song>): List<Song> = when (this) {
+        Original -> list
+        TitleAsc -> list.sortedBy { it.title.lowercase() }
+        TitleDesc -> list.sortedByDescending { it.title.lowercase() }
+        ArtistAsc -> list.sortedBy { it.artist.lowercase() }
+    }
 }
 
 /**
@@ -157,10 +176,28 @@ private fun ErrorBody(message: String, onRetry: () -> Unit) {
     }
 }
 
-/** Latar: cover yang di-blur, memudar ke warna latar aplikasi. */
+/**
+ * Latar halaman. Kalau warna cover sudah diketahui, latar memakai warna itu dan memudar ke warna aplikasi.
+ * Kalau belum, dipakai cover yang di-blur seperti sebelumnya.
+ */
 @Composable
-private fun BoxScope.PageBackdrop(imageUrl: String?) {
+private fun BoxScope.PageBackdrop(imageUrl: String?, tint: Color?) {
     val c = AppTheme.colors
+    if (tint != null) {
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to tint,
+                        0.5f to lerp(tint, c.background, 0.55f),
+                        0.85f to c.background,
+                        1f to c.background,
+                    ),
+                ),
+        )
+        return
+    }
     Artwork(
         listOf(AppleRed, c.surface),
         Modifier
@@ -185,8 +222,12 @@ private fun BoxScope.PageBackdrop(imageUrl: String?) {
 @Composable
 private fun AlbumBody(page: AlbumPage, onPlay: (Song, List<Song>) -> Unit) {
     val c = AppTheme.colors
+    var sort by remember(page.title) { mutableStateOf(TrackSort.Original) }
+    val songs = remember(page.songs, sort) { sort.apply(page.songs) }
+    val tint = rememberCoverTint(page.thumbnail)
+
     Box(Modifier.fillMaxSize()) {
-        PageBackdrop(page.thumbnail)
+        PageBackdrop(page.thumbnail, tint)
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 200.dp),
@@ -228,18 +269,20 @@ private fun AlbumBody(page: AlbumPage, onPlay: (Song, List<Song>) -> Unit) {
                     Spacer(Modifier.height(18.dp))
                     ActionRow(
                         onPlay = {
-                            page.songs.firstOrNull()?.let { onPlay(it, page.songs) }
+                            songs.firstOrNull()?.let { onPlay(it, songs) }
                         },
                         onShuffle = {
-                            val list = page.songs.shuffled()
+                            val list = songs.shuffled()
                             list.firstOrNull()?.let { onPlay(it, list) }
                         },
+                        sort = sort,
+                        onSort = { sort = it },
                     )
                     Spacer(Modifier.height(16.dp))
                 }
             }
-            itemsIndexed(page.songs) { index, song ->
-                TrackRow(number = index + 1, song = song) { onPlay(song, page.songs) }
+            items(songs) { song ->
+                TrackRow(song = song) { onPlay(song, songs) }
             }
         }
     }
@@ -253,7 +296,7 @@ private fun ArtistBody(
 ) {
     val c = AppTheme.colors
     Box(Modifier.fillMaxSize()) {
-        PageBackdrop(page.thumbnail)
+        PageBackdrop(page.thumbnail, null)
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 200.dp),
@@ -355,8 +398,8 @@ private fun ArtistBody(
 
             if (page.topSongs.isNotEmpty()) {
                 item { SectionTitle("Lagu populer") }
-                itemsIndexed(page.topSongs.take(10)) { index, song ->
-                    TrackRow(number = index + 1, song = song) { onPlay(song, page.topSongs) }
+                items(page.topSongs.take(10)) { song ->
+                    TrackRow(song = song) { onPlay(song, page.topSongs) }
                 }
             }
 
@@ -378,8 +421,14 @@ private fun ArtistBody(
 }
 
 @Composable
-private fun ActionRow(onPlay: () -> Unit, onShuffle: () -> Unit) {
+private fun ActionRow(
+    onPlay: () -> Unit,
+    onShuffle: () -> Unit,
+    sort: TrackSort,
+    onSort: (TrackSort) -> Unit,
+) {
     val c = AppTheme.colors
+    var sortMenuOpen by remember { mutableStateOf(false) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -418,6 +467,44 @@ private fun ActionRow(onPlay: () -> Unit, onShuffle: () -> Unit) {
                 modifier = Modifier.size(22.dp),
             )
         }
+        // Tombol urutkan dengan menu pilihan di bawahnya.
+        Box {
+            Box(
+                Modifier
+                    .size(50.dp)
+                    .clip(CircleShape)
+                    .background(c.textSecondary.copy(alpha = 0.15f))
+                    .clickable { sortMenuOpen = true },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.Sort,
+                    contentDescription = "Urutkan lagu",
+                    tint = c.text,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            DropdownMenu(
+                expanded = sortMenuOpen,
+                onDismissRequest = { sortMenuOpen = false },
+            ) {
+                TrackSort.entries.forEach { option ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                option.label,
+                                color = if (option == sort) c.text else c.textSecondary,
+                                fontWeight = if (option == sort) FontWeight.Bold else FontWeight.Normal,
+                            )
+                        },
+                        onClick = {
+                            onSort(option)
+                            sortMenuOpen = false
+                        },
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -432,23 +519,25 @@ private fun SectionTitle(title: String) {
     )
 }
 
+/** Satu baris lagu dengan cover kecil di kiri, seperti daftar lagu di aplikasi musik modern. */
 @Composable
-private fun TrackRow(number: Int, song: Song, onClick: () -> Unit) {
+private fun TrackRow(song: Song, onClick: () -> Unit) {
     val c = AppTheme.colors
     Column {
         Row(
             Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
-                .padding(horizontal = 20.dp, vertical = 12.dp),
+                .padding(horizontal = 20.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                "$number",
-                color = c.textSecondary,
-                fontSize = 15.sp,
-                modifier = Modifier.width(28.dp),
+            Artwork(
+                listOf(AppleRed, c.surface),
+                Modifier.size(52.dp),
+                corner = 6.dp,
+                imageUrl = song.thumbnail,
             )
+            Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     song.title,
@@ -470,7 +559,7 @@ private fun TrackRow(number: Int, song: Song, onClick: () -> Unit) {
             }
         }
         HorizontalDivider(
-            modifier = Modifier.padding(start = 48.dp),
+            modifier = Modifier.padding(start = 86.dp),
             thickness = 0.5.dp,
             color = c.divider,
         )
