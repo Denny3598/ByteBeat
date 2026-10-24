@@ -58,7 +58,7 @@ private sealed interface ExploreState {
 }
 
 @Composable
-fun ExploreScreen() {
+fun ExploreScreen(onOpenCategory: (String, String?, String) -> Unit = { _, _, _ -> }) {
     val c = AppTheme.colors
     var state by remember { mutableStateOf<ExploreState>(ExploreState.Loading) }
     var attempt by remember { mutableStateOf(0) }
@@ -136,7 +136,11 @@ fun ExploreScreen() {
                                 .fillMaxWidth()
                                 .padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
                         ) {
-                            row.forEach { mood -> MoodCard(mood, Modifier.weight(1f)) }
+                            row.forEach { mood ->
+                                MoodCard(mood, Modifier.weight(1f)) {
+                                    onOpenCategory(mood.browseId, mood.params, mood.title)
+                                }
+                            }
                             repeat(2 - row.size) { Spacer(Modifier.weight(1f)) }
                         }
                     }
@@ -151,7 +155,7 @@ fun ExploreScreen() {
  * Judul di pojok kiri atas, sama seperti BitChord.
  */
 @Composable
-private fun MoodCard(mood: ExploreMood, modifier: Modifier = Modifier) {
+private fun MoodCard(mood: ExploreMood, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val tone = remember(mood.color) { moodTone(mood.color) }
     // Cover diambil sendiri oleh kartu ini, jadi daftar kategori tampil lebih dulu.
     val cover by produceState<String?>(mood.coverUrl, mood.browseId, mood.params) {
@@ -161,6 +165,7 @@ private fun MoodCard(mood: ExploreMood, modifier: Modifier = Modifier) {
         modifier
             .aspectRatio(1.72f)
             .clip(RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
             .background(tone.stripe),
     ) {
         Box(
