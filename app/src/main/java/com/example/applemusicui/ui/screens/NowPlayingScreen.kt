@@ -5,7 +5,6 @@ import android.media.AudioManager
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -136,13 +135,6 @@ fun NowPlayingScreen(
     val titleAlpha = ((p - 0.2f) / 0.6f).coerceIn(0f, 1f)
     val controlsAlpha = ((p - 0.4f) / 0.6f).coerceIn(0f, 1f)
 
-    // Cover membesar saat diputar dan mengecil saat dijeda.
-    val coverScale by animateFloatAsState(
-        targetValue = if (controller.isPlaying) 1f else 0.9f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow),
-        label = "coverScale",
-    )
-
     val duration = controller.durationMs.toFloat().coerceAtLeast(1f)
     val position = controller.positionMs.toFloat().coerceIn(0f, duration)
     val shown = scrub ?: position
@@ -199,7 +191,7 @@ fun NowPlayingScreen(
                     ),
             )
 
-            Column(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().navigationBarsPadding()) {
                 // Cover edge-to-edge sampai atas layar. Bagian bawahnya memudar ke latar blur,
                 // jadi tidak ada batas yang terlihat.
                 Box(
@@ -208,8 +200,6 @@ fun NowPlayingScreen(
                         .aspectRatio(1f)
                         .graphicsLayer {
                             compositingStrategy = CompositingStrategy.Offscreen
-                            scaleX = coverScale
-                            scaleY = coverScale
                         }
                         .drawWithContent {
                             drawContent()
@@ -229,6 +219,9 @@ fun NowPlayingScreen(
                         imageUrl = song.thumbnail,
                     )
                 }
+
+                // Ruang kosong di antara cover dan info, supaya info dan kontrol turun ke bawah.
+                Spacer(Modifier.weight(1f))
 
                 // Judul, progres, dan waktu (muncul lebih dulu)
                 Column(
@@ -299,7 +292,6 @@ fun NowPlayingScreen(
                 // Kontrol, volume, dan aksi bawah (muncul sedikit setelah judul)
                 Column(
                     Modifier
-                        .navigationBarsPadding()
                         .padding(horizontal = 24.dp, vertical = 8.dp)
                         .graphicsLayer {
                             alpha = controlsAlpha
@@ -417,8 +409,6 @@ fun NowPlayingScreen(
                         BottomAction(Icons.Filled.QueueMusic, "Antrean")
                     }
                 }
-
-                Spacer(Modifier.weight(1f))
             }
 
             // Gagang di atas, di area status bar. Ketuk untuk menutup, atau tarik ke bawah.
