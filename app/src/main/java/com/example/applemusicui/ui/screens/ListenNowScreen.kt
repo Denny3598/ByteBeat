@@ -1,6 +1,8 @@
 package com.example.applemusicui.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +43,8 @@ import com.example.applemusicui.data.HomeShelf
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.components.Artwork
 import com.example.applemusicui.ui.components.ScreenHeader
+import com.example.applemusicui.ui.components.SongMenuHost
+import com.example.applemusicui.ui.components.SongMenuStyle
 import com.example.applemusicui.ui.theme.AppTheme
 import com.example.applemusicui.ui.theme.AppleRed
 
@@ -159,48 +163,66 @@ private fun RecentsShelf(shelf: HomeShelf, current: Song, onClick: (HomeCardItem
     }
 }
 
+/** Baris lagu di Home. Ditahan = popup aksi; titik tiga = sheet aksi. Album/playlist tidak punya menu. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ListRow(item: HomeCardItem, highlighted: Boolean, onClick: () -> Unit) {
     val c = AppTheme.colors
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Artwork(
-            listOf(AppleRed, c.surface),
-            Modifier.size(56.dp),
-            corner = 6.dp,
-            imageUrl = item.thumbnail,
-        )
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                item.title,
-                color = if (highlighted) AppleRed else c.text,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+    val song = item.toSong()
+    var menu by remember { mutableStateOf<SongMenuStyle?>(null) }
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = { if (song != null) menu = SongMenuStyle.Popup },
+                )
+                .padding(vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Artwork(
+                listOf(AppleRed, c.surface),
+                Modifier.size(56.dp),
+                corner = 6.dp,
+                imageUrl = item.thumbnail,
             )
-            if (item.subtitle.isNotBlank()) {
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
                 Text(
-                    item.subtitle,
-                    color = c.textSecondary,
-                    fontSize = 15.sp,
+                    item.title,
+                    color = if (highlighted) AppleRed else c.text,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (item.subtitle.isNotBlank()) {
+                    Text(
+                        item.subtitle,
+                        color = c.textSecondary,
+                        fontSize = 15.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            if (song != null) {
+                Icon(
+                    Icons.Filled.MoreVert,
+                    contentDescription = "Opsi",
+                    tint = c.textSecondary,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clickable { menu = SongMenuStyle.Sheet }
+                        .padding(4.dp),
+                )
             }
         }
-        Icon(
-            Icons.Filled.MoreVert,
-            contentDescription = "Opsi",
-            tint = c.textSecondary,
-            modifier = Modifier.size(22.dp),
-        )
+        val open = menu
+        if (song != null && open != null) {
+            SongMenuHost(song = song, style = open, onDismiss = { menu = null })
+        }
     }
 }
 
