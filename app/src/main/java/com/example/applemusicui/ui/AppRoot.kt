@@ -54,6 +54,9 @@ import com.example.applemusicui.ui.screens.ExploreScreen
 import com.example.applemusicui.ui.screens.LibraryScreen
 import com.example.applemusicui.ui.screens.ListenNowScreen
 import com.example.applemusicui.ui.screens.AboutScreen
+import com.example.applemusicui.ui.screens.CategoryScreen
+import com.example.applemusicui.ui.screens.categoryKey
+import com.example.applemusicui.ui.screens.parseCategoryKey
 import com.example.applemusicui.ui.screens.AccountScreen
 import com.example.applemusicui.ui.screens.LoginScreen
 import com.example.applemusicui.ui.screens.NowPlayingScreen
@@ -107,7 +110,11 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
         ) {
             when (tab) {
                 AppTab.Home -> ListenNowScreen(highlight, play, openPage)
-                AppTab.Explore -> ExploreScreen()
+                AppTab.Explore -> ExploreScreen(
+                    onOpenCategory = { browseId, params, title ->
+                        pages.add(categoryKey(browseId, params, title))
+                    },
+                )
                 AppTab.Library -> LibraryScreen(onPlay = play, onOpenPage = openPage)
                 AppTab.Search -> SearchScreen(highlight, play, openPage)
             }
@@ -115,12 +122,22 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
             // Halaman detail menutupi konten tab, tapi mini player dan tab bar tetap di atasnya.
             pages.lastOrNull()?.let { id ->
                 key(id) {
-                    DetailPageScreen(
-                        browseId = id,
-                        onPlay = play,
-                        onOpenPage = openPage,
-                        onBack = closePage,
-                    )
+                    val category = parseCategoryKey(id)
+                    if (category != null) {
+                        CategoryScreen(
+                            ref = category,
+                            onPlay = play,
+                            onOpenPage = openPage,
+                            onBack = closePage,
+                        )
+                    } else {
+                        DetailPageScreen(
+                            browseId = id,
+                            onPlay = play,
+                            onOpenPage = openPage,
+                            onBack = closePage,
+                        )
+                    }
                 }
             }
 
