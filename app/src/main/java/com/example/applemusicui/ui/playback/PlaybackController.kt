@@ -115,6 +115,9 @@ class PlaybackController(context: Context) {
         }
     }
 
+    /** Salinan antrean saat ini, untuk ditampilkan di sheet Antrean. */
+    fun queueSnapshot(): List<Song> = queue
+
     /** Lagu ini diputar setelah lagu yang sedang berjalan. */
     fun playNext(song: Song) {
         if (current == null) {
