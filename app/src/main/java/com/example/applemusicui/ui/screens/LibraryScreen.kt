@@ -1,5 +1,6 @@
 package com.example.applemusicui.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +20,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Download
@@ -37,6 +42,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -49,12 +55,32 @@ import com.example.applemusicui.data.LibraryRepository
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.components.Artwork
 import com.example.applemusicui.ui.components.ScreenHeader
-import com.example.applemusicui.ui.components.SectionHeader
 import com.example.applemusicui.ui.theme.AppTheme
 import com.example.applemusicui.ui.theme.AppleRed
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 private const val LIKED_ID = "FEmusic_liked_videos"
+
+/** Empat tab pustaka. Browse ID-nya adalah halaman library milik YouTube Music. */
+private enum class LibrarySection(val label: String, val browseId: String) {
+    Playlist("Playlist", "FEmusic_liked_playlists"),
+    Album("Album", "FEmusic_liked_albums"),
+    Artist("Artis", "FEmusic_library_corpus_track_artists"),
+    Subscription("Langganan", "FEmusic_library_corpus_artists"),
+}
+
+private suspend fun loadSections(): Map<LibrarySection, List<LibraryItem>> = coroutineScope {
+    LibrarySection.entries
+        .map { section ->
+            section to async(Dispatchers.IO) {
+                runCatching { LibraryRepository.library(section.browseId) }.getOrDefault(emptyList())
+            }
+        }
+        .associate { (section, deferred) -> section to deferred.await() }
+}
 
 @Composable
 fun LibraryScreen(onPlay: (Song, List<Song>) -> Unit = { _, _ -> }) {
@@ -62,17 +88,18 @@ fun LibraryScreen(onPlay: (Song, List<Song>) -> Unit = { _, _ -> }) {
     val scope = rememberCoroutineScope()
     val loggedIn = AppPrefs.isLoggedIn()
 
-    var playlists by remember { mutableStateOf<List<LibraryItem>?>(null) }
+    var sections by remember { mutableStateOf<Map<LibrarySection, List<LibraryItem>>?>(null) }
+    // null = tab "Semua" (tumpukan rak dengan "Lihat semua").
+    var selected by remember { mutableStateOf<LibrarySection?>(null) }
     var busyId by remember { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(loggedIn) {
-        playlists = if (loggedIn) {
-            runCatching { LibraryRepository.playlists() }.getOrDefault(emptyList())
-        } else {
-            emptyList()
-        }
+        sections = if (loggedIn) loadSections() else emptyMap()
     }
+
+    // Tombol Back menutup grid "Lihat semua" dulu, baru keluar dari layar.
+    BackHandler(enabled = selected != null) { selected = null }
 
     fun open(item: LibraryItem) {
         if (busyId != null) return
@@ -92,105 +119,223 @@ fun LibraryScreen(onPlay: (Song, List<Song>) -> Unit = { _, _ -> }) {
     }
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        ScreenHeader("Pustaka")
+        ScreenHeader("Perpustakaan")
+        SectionChips(selected = selected, onSelect = { selected = it })
 
-        LazyColumn(
-            Modifier.weight(1f),
-            contentPadding = PaddingValues(bottom = 200.dp),
-        ) {
-            message?.let { msg ->
-                item {
-                    Text(
-                        msg,
-                        color = AppleRed,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                    )
-                }
-            }
+        message?.let { msg ->
+            Text(
+                msg,
+                color = AppleRed,
+                fontSize = 14.sp,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            )
+        }
 
-            item {
-                LinkRow(
-                    title = "Unduhan",
-                    subtitle = "Musik yang disimpan untuk offline",
-                    icon = Icons.Filled.Download,
-                )
-            }
-            item {
-                LinkRow(
-                    title = "Musik lokal",
-                    subtitle = "Dari perangkat ini",
-                    icon = Icons.Filled.MusicNote,
-                )
-            }
-
-            if (loggedIn) {
+        val current = selected
+        val data = sections
+        if (current == null) {
+            LazyColumn(
+                Modifier.weight(1f),
+                contentPadding = PaddingValues(bottom = 200.dp),
+            ) {
                 item {
                     LinkRow(
-                        title = "Lagu yang disukai",
-                        subtitle = "Dari akun YouTube Music",
-                        icon = Icons.Filled.Favorite,
-                        busy = busyId == LIKED_ID,
-                        onClick = {
-                            open(LibraryItem("Lagu yang disukai", "", null, LIKED_ID))
-                        },
+                        title = "Unduhan",
+                        subtitle = "Musik yang disimpan untuk offline",
+                        icon = Icons.Filled.Download,
                     )
                 }
-
                 item {
-                    SectionHeader(title = "Playlist", action = null)
+                    LinkRow(
+                        title = "Musik lokal",
+                        subtitle = "Dari perangkat ini",
+                        icon = Icons.Filled.MusicNote,
+                    )
+                }
+                if (loggedIn) {
+                    item {
+                        LinkRow(
+                            title = "Lagu yang disukai",
+                            subtitle = "Dari akun YouTube Music",
+                            icon = Icons.Filled.Favorite,
+                            busy = busyId == LIKED_ID,
+                            onClick = { open(LibraryItem("Lagu yang disukai", "", null, LIKED_ID)) },
+                        )
+                    }
                 }
 
-                val list = playlists
-                when {
-                    list == null -> item {
+                if (!loggedIn) {
+                    item {
                         Text(
-                            "Memuat playlist…",
+                            "Masuk ke YouTube Music lewat Pengaturan untuk melihat pustaka akunmu.",
                             color = c.textSecondary,
                             fontSize = 15.sp,
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
                         )
                     }
-
-                    list.isEmpty() -> item {
+                } else if (data == null) {
+                    item {
                         Text(
-                            "Belum ada playlist di akunmu.",
+                            "Memuat pustaka…",
                             color = c.textSecondary,
                             fontSize = 15.sp,
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
                         )
                     }
-
-                    else -> item {
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 20.dp),
-                            horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        ) {
-                            items(list, key = { it.browseId }) { playlist ->
-                                PlaylistCard(
-                                    item = playlist,
-                                    busy = busyId == playlist.browseId,
-                                    onClick = { open(playlist) },
-                                )
+                } else {
+                    LibrarySection.entries.forEach { section ->
+                        val list = data[section].orEmpty()
+                        if (list.isNotEmpty()) {
+                            item(key = section.name) {
+                                Column {
+                                    SectionTitle(section.label) { selected = section }
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 20.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                    ) {
+                                        items(list.take(12), key = { it.browseId }) { item ->
+                                            LibraryCard(item, busy = busyId == item.browseId) { open(item) }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
-            } else {
-                item {
-                    Text(
-                        "Masuk ke YouTube Music lewat Pengaturan untuk melihat pustaka akunmu.",
-                        color = c.textSecondary,
-                        fontSize = 15.sp,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-                    )
+            }
+        } else {
+            val list = data?.get(current).orEmpty()
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 200.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                items(list, key = { it.browseId }) { item ->
+                    LibraryCard(
+                        item = item,
+                        busy = busyId == item.browseId,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { open(item) }
                 }
             }
         }
     }
 }
 
-/** Baris folder seperti di BitChord: ikon, judul, panah kanan, dan garis pemisah. */
+@Composable
+private fun SectionChips(selected: LibrarySection?, onSelect: (LibrarySection?) -> Unit) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(bottom = 8.dp),
+    ) {
+        item {
+            LibraryChip("Semua", selected = selected == null) { onSelect(null) }
+        }
+        items(LibrarySection.entries) { section ->
+            LibraryChip(section.label, selected = selected == section) { onSelect(section) }
+        }
+    }
+}
+
+@Composable
+private fun LibraryChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    val c = AppTheme.colors
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(percent = 50))
+            .background(if (selected) c.text else c.textSecondary.copy(alpha = 0.12f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Text(
+            label,
+            color = if (selected) c.background else c.text,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+@Composable
+private fun SectionTitle(title: String, onSeeAll: () -> Unit) {
+    val c = AppTheme.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 20.dp, top = 26.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            color = c.text,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            "Lihat semua",
+            color = c.text,
+            fontSize = 16.sp,
+            modifier = Modifier
+                .clickable(onClick = onSeeAll)
+                .padding(start = 12.dp, top = 6.dp, bottom = 6.dp),
+        )
+    }
+}
+
+@Composable
+private fun LibraryCard(
+    item: LibraryItem,
+    busy: Boolean,
+    modifier: Modifier = Modifier.width(160.dp),
+    onClick: () -> Unit,
+) {
+    val c = AppTheme.colors
+    Column(modifier.clickable(onClick = onClick)) {
+        Box(Modifier.fillMaxWidth()) {
+            Artwork(
+                listOf(AppleRed, c.surface),
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f),
+                corner = 14.dp,
+                imageUrl = item.thumbnail,
+            )
+            if (busy) {
+                CircularProgressIndicator(
+                    Modifier
+                        .align(Alignment.Center)
+                        .size(28.dp),
+                    color = Color.White,
+                    strokeWidth = 3.dp,
+                )
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            item.title,
+            color = c.text,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (item.subtitle.isNotBlank()) {
+            Text(
+                item.subtitle,
+                color = c.textSecondary,
+                fontSize = 14.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** Baris folder: ikon, judul, panah kanan (kalau bisa diketuk), dan garis pemisah. */
 @Composable
 private fun LinkRow(
     title: String,
@@ -251,53 +396,5 @@ private fun LinkRow(
             thickness = 0.5.dp,
             color = c.divider,
         )
-    }
-}
-
-@Composable
-private fun PlaylistCard(item: LibraryItem, busy: Boolean, onClick: () -> Unit) {
-    val c = AppTheme.colors
-    Column(
-        Modifier
-            .width(150.dp)
-            .clickable(onClick = onClick),
-    ) {
-        Box(Modifier.fillMaxWidth()) {
-            Artwork(
-                listOf(AppleRed, c.surface),
-                Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f),
-                corner = 12.dp,
-                imageUrl = item.thumbnail,
-            )
-            if (busy) {
-                CircularProgressIndicator(
-                    Modifier
-                        .align(Alignment.Center)
-                        .size(28.dp),
-                    color = Color.White,
-                    strokeWidth = 3.dp,
-                )
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            item.title,
-            color = c.text,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (item.subtitle.isNotBlank()) {
-            Text(
-                item.subtitle,
-                color = c.textSecondary,
-                fontSize = 13.sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
     }
 }
