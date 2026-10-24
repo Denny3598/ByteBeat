@@ -368,7 +368,7 @@ private fun ArtistBody(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                        Box(Modifier.weight(1f).padding(end = 16.dp), contentAlignment = Alignment.CenterEnd) {
                             Box(
                                 Modifier
                                     .size(52.dp)
@@ -618,7 +618,7 @@ private fun ActionRow(
         Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+        Box(Modifier.weight(1f).padding(end = 14.dp), contentAlignment = Alignment.CenterEnd) {
             Box(
                 Modifier
                     .size(50.dp)
@@ -637,7 +637,7 @@ private fun ActionRow(
         }
         Row(
             Modifier
-                .width(150.dp)
+                .width(130.dp)
                 .height(50.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(c.text)
@@ -655,7 +655,7 @@ private fun ActionRow(
             Text("Putar", color = c.background, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
         // Tombol urutkan dengan menu pilihan di bawahnya.
-        Box(Modifier.weight(1f)) {
+        Box(Modifier.weight(1f).padding(start = 14.dp)) {
             Box(
                 Modifier
                     .size(50.dp)
