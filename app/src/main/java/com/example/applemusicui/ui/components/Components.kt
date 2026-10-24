@@ -96,6 +96,8 @@ fun Avatar(modifier: Modifier = Modifier, size: Dp = 46.dp) {
         modifier
             .size(size)
             .clip(CircleShape)
+            .background(c.glass)
+            .border(1.dp, c.glassBorder, CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -249,7 +251,7 @@ fun AlbumCard(album: Album, size: Dp = 150.dp) {
     }
 }
 
-/** Mini player melayang dengan semburat warna cover. */
+/** Mini player melayang, transparan seperti tab bar di bawah. */
 @Composable
 fun MiniPlayer(
     song: Song,
@@ -265,12 +267,7 @@ fun MiniPlayer(
             .fillMaxWidth()
             .height(68.dp)
             .clip(shape)
-            .background(c.surface)
-            .background(
-                Brush.horizontalGradient(
-                    listOf(Color.Transparent, song.art.first().copy(alpha = 0.30f)),
-                ),
-            )
+            .background(c.glass)
             .border(1.dp, c.glassBorder, shape)
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
