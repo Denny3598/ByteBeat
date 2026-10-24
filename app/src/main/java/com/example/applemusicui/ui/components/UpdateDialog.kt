@@ -24,8 +24,8 @@ fun UpdateDialog(info: UpdateInfo, onDismiss: () -> Unit) {
         },
         text = {
             Text(
-                "Build terbaru ByteBeat sudah siap. Unduhannya berjalan di latar belakang, " +
-                    "lalu ketuk notifikasi unduhan untuk memasangnya.",
+                "Build terbaru ByteBeat sudah siap. Setelah unduhan selesai, " +
+                    "jendela pemasangan akan terbuka otomatis.",
                 color = c.textSecondary,
             )
         },
