@@ -136,6 +136,7 @@ private fun SyncedLyricsDialog(
                     ),
                 ),
         ) {
+            LyricParticles(color = tint ?: c.text, modifier = Modifier.fillMaxSize())
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 LazyColumn(
                     state = listState,
