@@ -32,7 +32,7 @@ import com.example.applemusicui.ui.playback.PlaybackController
 import com.example.applemusicui.ui.theme.AppTheme
 import kotlinx.coroutines.CancellationException
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Alignment
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
