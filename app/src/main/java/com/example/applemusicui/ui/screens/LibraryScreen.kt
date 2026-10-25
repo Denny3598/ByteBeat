@@ -1,5 +1,6 @@
 package com.example.applemusicui.ui.screens
 
+import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -53,10 +54,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.applemusicui.data.AppPrefs
+import com.example.applemusicui.data.LikeRepository
 import com.example.applemusicui.data.LibraryItem
 import com.example.applemusicui.data.LibraryRepository
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.components.Artwork
+import androidx.compose.ui.platform.LocalContext
 import com.example.applemusicui.ui.components.PageMenuCard
 import com.example.applemusicui.ui.components.PageMenuTarget
 import com.example.applemusicui.ui.components.ScreenHeader
@@ -81,9 +84,13 @@ private enum class LibrarySection(val label: String, val browseId: String) {
 /** Data pustaka yang sudah dimuat. Disimpan selama aplikasi hidup, supaya Pustaka langsung tampil tanpa menunggu. */
 private var cachedSections: Map<LibrarySection, List<LibraryItem>>? = null
 
-/** Memuat ulang semua rak pustaka ke cache. Dipanggil saat aplikasi dibuka dan saat Pustaka dibuka. */
-suspend fun refreshLibraryCache() {
+/**
+ * Memuat ulang semua rak pustaka ke cache, sekaligus menyamakan status suka di HP dengan
+ * "Lagu yang disukai" di YouTube Music. Dipanggil saat aplikasi dibuka dan saat Pustaka dibuka.
+ */
+suspend fun refreshLibraryCache(context: Context) {
     if (!AppPrefs.isLoggedIn()) return
+    LikeRepository.syncFromYouTube(context)
     val fresh = loadSections()
     // Kalau semua gagal (misalnya tidak ada internet), data lama tetap dipakai.
     if (fresh.values.any { it.isNotEmpty() }) cachedSections = fresh
@@ -110,6 +117,7 @@ fun LibraryScreen(
     onOpenPage: (String) -> Unit = {},
 ) {
     val c = AppTheme.colors
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val loggedIn = AppPrefs.isLoggedIn()
 
@@ -120,7 +128,7 @@ fun LibraryScreen(
     var message by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(loggedIn) {
-        refreshLibraryCache()
+        refreshLibraryCache(context)
         sections = cachedSections ?: emptyMap()
     }
 

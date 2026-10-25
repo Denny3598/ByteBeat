@@ -158,11 +158,10 @@ private fun rememberSongActions(song: Song, onDismiss: () -> Unit, onInfo: () ->
             if (liked) "Hapus dari suka" else "Suka",
             if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
         ) {
-            // Status lokal langsung berubah, lalu dikirim ke akun YouTube Music. Scope sendiri,
-            // supaya permintaan tidak batal saat popup sudah tertutup.
-            val now = FavoritesStore.toggle(context, song.url)
+            // Dikirim ke akun YouTube Music. Scope sendiri, supaya permintaan tidak batal
+            // saat popup sudah tertutup.
             CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-                LikeRepository.setLiked(song.url, now)
+                LikeRepository.toggle(context, song.url)
             }
             onDismiss()
         },

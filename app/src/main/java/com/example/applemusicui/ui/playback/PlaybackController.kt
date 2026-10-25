@@ -84,8 +84,9 @@ class PlaybackController private constructor(context: Context) {
         override fun onPlayerError(error: PlaybackException) {
             val song = current ?: return
             if (retries < MAX_RETRY) {
-                // Stream bisa kedaluwarsa atau koneksi putus: ambil ulang dan lanjut dari posisi terakhir.
+                // Stream bisa kedaluwarsa atau koneksi putus: ambil alamat baru dan lanjut dari posisi terakhir.
                 retries++
+                StreamResolver.invalidate(song.url)
                 start(song, queue, positionMs)
             } else {
                 isPlaying = false
@@ -145,6 +146,7 @@ class PlaybackController private constructor(context: Context) {
                 if (startMs > 0L) player.seekTo(startMs)
                 player.play()
                 loading = false
+                prefetchNext()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -153,6 +155,14 @@ class PlaybackController private constructor(context: Context) {
                 loading = false
             }
         }
+    }
+
+    /** Menyiapkan alamat audio lagu berikutnya di latar belakang, supaya pindah lagu tidak jeda. */
+    private fun prefetchNext() {
+        val index = queue.indexOf(current)
+        if (index < 0 || queue.size < 2) return
+        val nextIndex = (index + 1) % queue.size
+        StreamResolver.prefetch(queue[nextIndex].url)
     }
 
     /** Salinan antrean saat ini, untuk ditampilkan di sheet Antrean. */

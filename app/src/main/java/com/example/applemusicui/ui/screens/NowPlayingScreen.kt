@@ -115,11 +115,10 @@ fun NowPlayingScreen(
     var sheet by remember { mutableStateOf<NowSheet?>(null) }
     var liked by remember(song.url) { mutableStateOf(FavoritesStore.isFavorite(context, song.url)) }
 
-    // Status lokal langsung berubah, lalu dikirim ke akun YouTube Music (kalau sudah login).
+    // Tampilan langsung berubah, lalu dikirim ke akun YouTube Music. Kalau gagal, dikembalikan.
     fun toggleLike() {
-        val now = FavoritesStore.toggle(context, song.url)
-        liked = now
-        scope.launch { LikeRepository.setLiked(song.url, now) }
+        liked = !liked
+        scope.launch { liked = LikeRepository.toggle(context, song.url) }
     }
 
     // Posisi sheet dalam piksel: screenHeightPx = tersembunyi di bawah, 0f = terbuka penuh.

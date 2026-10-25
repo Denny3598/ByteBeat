@@ -1,5 +1,6 @@
 package com.example.applemusicui.data
 
+import android.content.Context
 import android.webkit.CookieManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -14,6 +15,7 @@ import java.util.concurrent.TimeUnit
 
 /** Menyukai lagu di akun YouTube Music yang sedang login. Tanpa login, tidak melakukan apa-apa. */
 object LikeRepository {
+    private const val LIKED_VIDEOS_ID = "FEmusic_liked_videos"
     private const val LIKE_API = "https://music.youtube.com/youtubei/v1/like/like?prettyPrint=false"
     private const val UNLIKE_API = "https://music.youtube.com/youtubei/v1/like/removelike?prettyPrint=false"
     private const val YT_ORIGIN = "https://music.youtube.com"
@@ -27,6 +29,29 @@ object LikeRepository {
         .callTimeout(25, TimeUnit.SECONDS)
         .build()
     private val jsonType = "application/json; charset=utf-8".toMediaType()
+
+    /**
+     * Membalik status suka lagu. Status lokal langsung berubah supaya tombol responsif, lalu dikirim
+     * ke YouTube Music. Kalau pengiriman gagal, status dikembalikan seperti semula.
+     * Tanpa login, hanya disimpan di HP.
+     */
+    suspend fun toggle(context: Context, songUrl: String): Boolean {
+        val nowLiked = FavoritesStore.toggle(context, songUrl)
+        if (!AppPrefs.isLoggedIn()) return nowLiked
+        if (setLiked(songUrl, nowLiked)) return nowLiked
+        FavoritesStore.set(context, songUrl, !nowLiked)
+        return !nowLiked
+    }
+
+    /**
+     * Menyamakan cache favorit di HP dengan daftar "Lagu yang disukai" di akun YouTube Music.
+     * Hanya mengambil halaman pertama daftar itu.
+     */
+    suspend fun syncFromYouTube(context: Context) {
+        if (!AppPrefs.isLoggedIn()) return
+        val liked = runCatching { LibraryRepository.tracks(LIKED_VIDEOS_ID) }.getOrNull() ?: return
+        FavoritesStore.replaceAll(context, liked.map { it.url }.toSet())
+    }
 
     /** Mengirim suka atau batal suka ke YouTube Music. Mengembalikan true kalau berhasil. */
     suspend fun setLiked(songUrl: String, liked: Boolean): Boolean = withContext(Dispatchers.IO) {

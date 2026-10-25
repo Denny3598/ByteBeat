@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.applemusicui.data.AppPrefs
 import com.example.applemusicui.data.DummyData
+import com.example.applemusicui.data.FavoritesStore
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.components.AppTab
 import com.example.applemusicui.ui.components.LocalOnAvatarClick
@@ -106,7 +107,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
     }
     // Pustaka dimuat sejak awal, supaya saat tab Pustaka dibuka datanya sudah ada.
     LaunchedEffect(Unit) {
-        runCatching { refreshLibraryCache() }
+        runCatching { refreshLibraryCache(context) }
     }
     var showLogin by rememberSaveable { mutableStateOf(false) }
     var loggedIn by remember { mutableStateOf(AppPrefs.isLoggedIn()) }
@@ -296,6 +297,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
                     onLogin = { showLogin = true },
                     onLogout = {
                         AppPrefs.logout()
+                        FavoritesStore.replaceAll(context, emptySet())
                         clearLibraryCache()
                         loggedIn = false
                     },
