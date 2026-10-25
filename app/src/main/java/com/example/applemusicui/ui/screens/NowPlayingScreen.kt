@@ -451,7 +451,7 @@ fun NowPlayingScreen(
 
         // Sheet Lirik dan Antrean.
         when (sheet) {
-            NowSheet.Lyrics -> LyricsSheet(song = song, onDismiss = { sheet = null })
+            NowSheet.Lyrics -> LyricsView(song = song, controller = controller, onDismiss = { sheet = null })
             NowSheet.Queue -> QueueSheet(current = song, controller = controller, onDismiss = { sheet = null })
             null -> Unit
         }
