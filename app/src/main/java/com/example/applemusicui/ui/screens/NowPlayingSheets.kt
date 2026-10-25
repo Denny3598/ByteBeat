@@ -28,10 +28,30 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.applemusicui.data.LyricsRepository
 import com.example.applemusicui.data.Song
-import com.example.applemusicui.ui.components.SongRow
 import com.example.applemusicui.ui.playback.PlaybackController
 import com.example.applemusicui.ui.theme.AppTheme
 import kotlinx.coroutines.CancellationException
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Alignment
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.item
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
+import com.example.applemusicui.ui.components.Artwork
+import com.example.applemusicui.ui.playback.QueueSection
+import com.example.applemusicui.ui.theme.AppleRed
 
 /** Sheet yang bisa dibuka dari pemutar penuh. */
 enum class NowSheet { Lyrics, Queue }
@@ -94,40 +114,160 @@ fun LyricsSheet(song: Song, onDismiss: () -> Unit) {
     }
 }
 
-/** Antrean pemutaran, dibuka sebagai sheet. Ketuk lagu untuk memutarnya. */
+/**
+ * Antrean seperti BitChord: riwayat, lagu yang sedang diputar, lalu lagu berikutnya yang ditambahkan
+ * pengguna (bisa dinaikkan, diturunkan, atau dihapus), daftar asal, dan AutoPlay.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun QueueSheet(current: Song, controller: PlaybackController, onDismiss: () -> Unit) {
+fun QueueSheet(controller: PlaybackController, onDismiss: () -> Unit) {
     val c = AppTheme.colors
-    val list = remember(current.url) { controller.queueSnapshot() }
+    val entries = controller.entries
+    val now = controller.currentIndex
+    val hasUpcomingUser = entries.withIndex().any { it.index > now && it.value.section == QueueSection.USER }
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = c.surface) {
-        Text(
-            "Antrean",
-            color = c.text,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-        )
-        if (list.isEmpty()) {
-            Text(
-                "Antrean masih kosong.",
-                color = c.textSecondary,
-                fontSize = 15.sp,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-            )
-        } else {
-            LazyColumn(
-                Modifier.heightIn(max = 560.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-            ) {
-                items(list) { song ->
-                    SongRow(song, highlighted = song.url == current.url) {
-                        controller.play(song, list)
+        LazyColumn(
+            Modifier.heightIn(max = 620.dp),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+        ) {
+            item {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Antrean",
+                        color = c.text,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (hasUpcomingUser) {
+                        Text(
+                            "Kosongkan",
+                            color = AppleRed,
+                            fontSize = 15.sp,
+                            modifier = Modifier
+                                .clickable { controller.clearUserUpcoming() }
+                                .padding(8.dp),
+                        )
                     }
                 }
             }
+            if (entries.isEmpty()) {
+                item {
+                    Text(
+                        "Antrean masih kosong.",
+                        color = c.textSecondary,
+                        fontSize = 15.sp,
+                        modifier = Modifier.padding(vertical = 12.dp),
+                    )
+                }
+            }
+
+            // Riwayat: lagu yang sudah diputar, paling lama di atas.
+            val past = entries.withIndex().filter { it.index < now }.takeLast(20)
+            if (past.isNotEmpty()) {
+                item { QueueHeading("Riwayat") }
+                items(past, key = { "past-${it.index}" }) { indexed ->
+                    QueueRow(indexed.value.song, highlighted = false, dim = true, onClick = { controller.jumpTo(indexed.index) }) {}
+                }
+            }
+
+            // Yang sedang diputar.
+            entries.getOrNull(now)?.let { entry ->
+                item { QueueHeading("Sedang diputar") }
+                item(key = "now") {
+                    QueueRow(entry.song, highlighted = true, dim = false, onClick = {}) {
+                        Icon(Icons.Filled.GraphicEq, contentDescription = null, tint = AppleRed, modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+
+            // Yang akan datang, per bagian.
+            val sections = listOf(
+                QueueSection.USER to "Berikutnya",
+                QueueSection.CONTEXT to "Dari daftar",
+                QueueSection.AUTOPLAY to "AutoPlay",
+            )
+            for ((section, label) in sections) {
+                val upcoming = entries.withIndex().filter { it.index > now && it.value.section == section }
+                if (upcoming.isEmpty()) continue
+                item { QueueHeading(label) }
+                items(upcoming, key = { "up-${section.name}-${it.index}" }) { indexed ->
+                    val i = indexed.index
+                    QueueRow(indexed.value.song, highlighted = false, dim = false, onClick = { controller.jumpTo(i) }) {
+                        if (section == QueueSection.USER) {
+                            QueueAction(Icons.Filled.KeyboardArrowUp, "Naikkan") { controller.moveUserUpcoming(i, -1) }
+                            QueueAction(Icons.Filled.KeyboardArrowDown, "Turunkan") { controller.moveUserUpcoming(i, 1) }
+                        }
+                        QueueAction(Icons.Filled.Close, "Hapus") { controller.removeUpcoming(i) }
+                    }
+                }
+            }
+
+            item { Spacer(Modifier.height(24.dp)) }
         }
-        Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun QueueHeading(text: String) {
+    Text(
+        text,
+        color = AppTheme.colors.textSecondary,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Medium,
+        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+    )
+}
+
+@Composable
+private fun QueueRow(
+    song: Song,
+    highlighted: Boolean,
+    dim: Boolean,
+    onClick: () -> Unit,
+    trailing: @Composable RowScope.() -> Unit,
+) {
+    val c = AppTheme.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .alpha(if (dim) 0.55f else 1f)
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Artwork(listOf(AppleRed, c.surface), Modifier.size(44.dp), corner = 6.dp, imageUrl = song.thumbnail)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                song.title,
+                color = if (highlighted) AppleRed else c.text,
+                fontSize = 15.sp,
+                fontWeight = if (highlighted) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                song.artist,
+                color = c.textSecondary,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        trailing()
+    }
+}
+
+@Composable
+private fun QueueAction(icon: ImageVector, description: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(36.dp)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = description, tint = AppTheme.colors.textSecondary, modifier = Modifier.size(20.dp))
     }
 }

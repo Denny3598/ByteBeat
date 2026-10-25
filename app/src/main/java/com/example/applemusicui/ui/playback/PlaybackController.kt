@@ -4,7 +4,9 @@ import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.media3.common.MediaItem
@@ -15,6 +17,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.example.applemusicui.data.Song
+import com.example.applemusicui.data.SongExtras
 import com.example.applemusicui.data.StreamResolver
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -24,15 +27,29 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+/** Bagian antrean: dari mana sebuah lagu masuk. */
+enum class QueueSection { USER, CONTEXT, AUTOPLAY }
+
+/** Satu lagu di antrean beserta bagiannya. */
+data class QueueEntry(val song: Song, val section: QueueSection)
 
 /**
  * Pemutar untuk UI dan antrean. Hanya ada satu per proses, dan tidak dilepas saat layar ditutup,
  * supaya lagu berikutnya tetap diputar walau aplikasi tidak sedang terbuka.
+ *
+ * Antrean dibagi tiga bagian seperti BitChord:
+ * - USER: lagu yang ditambahkan lewat "Putar berikutnya" atau "Tambahkan ke antrean".
+ * - CONTEXT: daftar yang sedang diputar (album, playlist, dan sebagainya).
+ * - AUTOPLAY: radio dari YouTube Music, ditambahkan saat antrean hampir habis.
+ * Lagu sebelum [currentIndex] adalah riwayat.
  */
 class PlaybackController private constructor(context: Context) {
 
     companion object {
         private const val MAX_RETRY = 2
+        private const val AUTOPLAY_REFILL_BELOW = 2
 
         @Volatile
         private var instance: PlaybackController? = null
@@ -59,8 +76,15 @@ class PlaybackController private constructor(context: Context) {
     var durationMs by mutableLongStateOf(0L)
         private set
 
-    private var queue: List<Song> = emptyList()
+    private val queue = mutableStateListOf<QueueEntry>()
+    /** Seluruh antrean (riwayat, lagu yang sedang diputar, dan yang akan datang). */
+    val entries: List<QueueEntry> get() = queue
+    var currentIndex by mutableIntStateOf(-1)
+        private set
+
     private var loadJob: Job? = null
+    private var autoplayJob: Job? = null
+    private var lastAutoplaySeed: String? = null
     private var retries = 0
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -76,8 +100,7 @@ class PlaybackController private constructor(context: Context) {
             }
             if (playbackState == Player.STATE_ENDED) {
                 // Lagu terakhir di antrean berhenti, seperti Apple Music.
-                val index = queue.indexOf(current)
-                if (index >= 0 && index < queue.lastIndex) next() else isPlaying = false
+                if (currentIndex >= 0 && currentIndex < queue.lastIndex) next() else isPlaying = false
             }
         }
 
@@ -87,7 +110,7 @@ class PlaybackController private constructor(context: Context) {
                 // Stream bisa kedaluwarsa atau koneksi putus: ambil alamat baru dan lanjut dari posisi terakhir.
                 retries++
                 StreamResolver.invalidate(song.url)
-                start(song, queue, positionMs)
+                startCurrent(positionMs)
             } else {
                 isPlaying = false
                 loading = false
@@ -113,14 +136,40 @@ class PlaybackController private constructor(context: Context) {
         }
     }
 
-    /** Putar [song]; [list] adalah antrean untuk tombol berikutnya/sebelumnya. */
+    /** Putar [song]; [list] adalah daftar asal, dan lagu-lagu sebelum [song] jadi riwayat. */
     fun play(song: Song, list: List<Song> = listOf(song)) {
+        val items = if (list.contains(song)) list else listOf(song) + list
+        val index = items.indexOf(song)
+
+        // Antrean yang ditambahkan pengguna tetap dipertahankan dan diletakkan tepat setelah lagu yang dipilih.
+        val keptUser = if (currentIndex >= 0) {
+            queue.drop(currentIndex + 1).filter { it.section == QueueSection.USER }
+        } else {
+            emptyList()
+        }
+        queue.clear()
+        items.take(index).forEach { queue.add(QueueEntry(it, QueueSection.CONTEXT)) }
+        queue.add(QueueEntry(song, QueueSection.CONTEXT))
+        queue.addAll(keptUser)
+        items.drop(index + 1).forEach { queue.add(QueueEntry(it, QueueSection.CONTEXT)) }
+
+        currentIndex = items.take(index).size
+        lastAutoplaySeed = null
         retries = 0
-        start(song, list, 0L)
+        startCurrent(0L)
     }
 
-    private fun start(song: Song, list: List<Song>, startMs: Long) {
-        queue = list
+    /** Lompat ke lagu di indeks [index] di antrean (dipakai dari sheet Antrean). */
+    fun jumpTo(index: Int) {
+        if (index !in queue.indices) return
+        currentIndex = index
+        retries = 0
+        startCurrent(0L)
+    }
+
+    private fun startCurrent(startMs: Long) {
+        val entry = queue.getOrNull(currentIndex) ?: return
+        val song = entry.song
         current = song
         errorText = null
         positionMs = startMs
@@ -147,6 +196,7 @@ class PlaybackController private constructor(context: Context) {
                 player.play()
                 loading = false
                 prefetchNext()
+                refillAutoplay(song)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -159,36 +209,71 @@ class PlaybackController private constructor(context: Context) {
 
     /** Menyiapkan alamat audio lagu berikutnya di latar belakang, supaya pindah lagu tidak jeda. */
     private fun prefetchNext() {
-        val index = queue.indexOf(current)
-        if (index < 0 || queue.size < 2) return
-        val nextIndex = (index + 1) % queue.size
-        StreamResolver.prefetch(queue[nextIndex].url)
+        val next = queue.getOrNull(currentIndex + 1) ?: return
+        StreamResolver.prefetch(next.song.url)
     }
 
-    /** Salinan antrean saat ini, untuk ditampilkan di sheet Antrean. */
-    fun queueSnapshot(): List<Song> = queue
+    /** Kalau antrean hampir habis, tambahkan radio dari lagu ini sebagai bagian AUTOPLAY. */
+    private fun refillAutoplay(seed: Song) {
+        val remaining = queue.size - currentIndex - 1
+        if (remaining > AUTOPLAY_REFILL_BELOW) return
+        if (autoplayJob?.isActive == true || lastAutoplaySeed == seed.url) return
+        val videoId = seed.url.substringAfter("v=", "").substringBefore("&")
+        if (videoId.isBlank()) return
+        lastAutoplaySeed = seed.url
+        autoplayJob = scope.launch {
+            val more = runCatching { withContext(Dispatchers.IO) { SongExtras.radio(videoId) } }
+                .getOrDefault(emptyList())
+            val existing = queue.map { it.song.url }.toMutableSet()
+            more.forEach { song ->
+                if (existing.add(song.url)) queue.add(QueueEntry(song, QueueSection.AUTOPLAY))
+            }
+        }
+    }
 
-    /** Lagu ini diputar setelah lagu yang sedang berjalan. */
+    /**
+     * Menambahkan lagu tepat setelah lagu yang sedang diputar, mendahului lagu lain di antrean pengguna.
+     */
     fun playNext(song: Song) {
-        if (current == null) {
+        if (currentIndex < 0) {
             play(song)
             return
         }
-        val index = queue.indexOf(current)
-        queue = if (index < 0) {
-            queue + song
-        } else {
-            queue.toMutableList().apply { add(index + 1, song) }
-        }
+        queue.add(currentIndex + 1, QueueEntry(song, QueueSection.USER))
     }
 
-    /** Lagu ini ditambahkan di paling akhir antrean. */
+    /** Menambahkan lagu di akhir bagian USER antrean. */
     fun addToQueue(song: Song) {
-        if (current == null) {
+        if (currentIndex < 0) {
             play(song)
             return
         }
-        queue = queue + song
+        var at = currentIndex + 1
+        while (at < queue.size && queue[at].section == QueueSection.USER) at++
+        queue.add(at, QueueEntry(song, QueueSection.USER))
+    }
+
+    /** Menghapus lagu yang belum diputar. Lagu yang sedang diputar dan riwayat tidak bisa dihapus. */
+    fun removeUpcoming(index: Int) {
+        if (index <= currentIndex || index !in queue.indices) return
+        queue.removeAt(index)
+    }
+
+    /** Menukar posisi dua lagu USER yang belum diputar (naik atau turun satu langkah). */
+    fun moveUserUpcoming(index: Int, delta: Int) {
+        val to = index + delta
+        if (index <= currentIndex || to <= currentIndex) return
+        if (index !in queue.indices || to !in queue.indices) return
+        if (queue[index].section != QueueSection.USER || queue[to].section != QueueSection.USER) return
+        val item = queue.removeAt(index)
+        queue.add(to, item)
+    }
+
+    /** Mengosongkan lagu USER yang belum diputar. */
+    fun clearUserUpcoming() {
+        for (i in queue.indices.reversed()) {
+            if (i > currentIndex && queue[i].section == QueueSection.USER) queue.removeAt(i)
+        }
     }
 
     fun togglePlay() {
@@ -196,16 +281,15 @@ class PlaybackController private constructor(context: Context) {
         if (errorText != null) {
             // Setelah gagal, ketuk putar akan mengambil ulang stream.
             retries = 0
-            start(song, queue, positionMs)
+            startCurrent(positionMs)
             return
         }
         if (player.isPlaying) player.pause() else player.play()
     }
 
     fun next() {
-        val index = queue.indexOf(current)
-        if (queue.isEmpty() || index < 0) return
-        play(queue[(index + 1) % queue.size], queue)
+        if (queue.isEmpty() || currentIndex < 0) return
+        jumpTo((currentIndex + 1) % queue.size)
     }
 
     /** Seperti Apple Music: kalau sudah lewat 3 detik, ulang dari awal. */
@@ -214,9 +298,8 @@ class PlaybackController private constructor(context: Context) {
             seekTo(0L)
             return
         }
-        val index = queue.indexOf(current)
-        if (queue.isEmpty() || index < 0) return
-        play(queue[(index - 1 + queue.size) % queue.size], queue)
+        if (queue.isEmpty() || currentIndex < 0) return
+        jumpTo((currentIndex - 1 + queue.size) % queue.size)
     }
 
     fun seekTo(ms: Long) {
