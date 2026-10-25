@@ -51,6 +51,8 @@ fun AccountScreen(
     onBack: () -> Unit,
     onLogin: () -> Unit,
     onLogout: () -> Unit,
+    onOpenLibrary: () -> Unit = {},
+    onPlayLiked: () -> Unit = {},
 ) {
     val c = AppTheme.colors
     // Profil (nama dan foto) diambil dari YouTube Music saat sudah login.
@@ -171,8 +173,8 @@ fun AccountScreen(
                 .clip(RoundedCornerShape(20.dp))
                 .background(c.surface),
         ) {
-            InfoRow(Icons.Filled.PlaylistPlay, "Playlist dan pustaka")
-            InfoRow(Icons.Filled.Favorite, "Lagu yang kamu suka")
+            InfoRow(Icons.Filled.PlaylistPlay, "Playlist dan pustaka", onClick = onOpenLibrary)
+            InfoRow(Icons.Filled.Favorite, "Lagu yang kamu suka", onClick = onPlayLiked)
         }
 
         Text(
@@ -214,11 +216,12 @@ private fun AccountButton(
 }
 
 @Composable
-private fun InfoRow(icon: ImageVector, label: String) {
+private fun InfoRow(icon: ImageVector, label: String, onClick: () -> Unit) {
     val c = AppTheme.colors
     Row(
         Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
