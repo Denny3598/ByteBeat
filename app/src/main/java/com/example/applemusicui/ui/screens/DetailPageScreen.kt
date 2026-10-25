@@ -46,8 +46,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
@@ -254,22 +258,25 @@ private fun BoxScope.PageBackdrop(imageUrl: String?, tint: Color?, fullCover: Bo
                 .fillMaxWidth()
                 .height(COVER_HEIGHT),
         ) {
+            // Gambarnya sendiri dibuat memudar ke transparan (bukan ke warna solid), supaya
+            // tidak ada garis batas dengan latar di bawahnya.
             Artwork(
                 listOf(AppleRed, c.surface),
-                Modifier.matchParentSize(),
-                corner = 0.dp,
-                imageUrl = imageUrl,
-            )
-            Box(
                 Modifier
                     .matchParentSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            0.55f to Color.Transparent,
-                            1f to c.background,
-                        ),
-                    ),
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                0.4f to Color.Black,
+                                1f to Color.Transparent,
+                            ),
+                            blendMode = BlendMode.DstIn,
+                        )
+                    },
+                corner = 0.dp,
+                imageUrl = imageUrl,
             )
         }
     }
