@@ -117,7 +117,8 @@ private fun SyncedLyricsDialog(
     }
 
     LaunchedEffect(activeIndex) {
-        if (activeIndex >= 0) listState.animateScrollToItem(activeIndex)
+        // Item 0 adalah header, jadi baris lirik ke-i ada di item i + 1.
+        if (activeIndex >= 0) listState.animateScrollToItem(activeIndex + 1)
     }
 
     Dialog(
