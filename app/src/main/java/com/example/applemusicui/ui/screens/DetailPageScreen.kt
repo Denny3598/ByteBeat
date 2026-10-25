@@ -298,15 +298,20 @@ private fun AlbumBody(page: AlbumPage, onPlay: (Song, List<Song>) -> Unit, showN
                         .padding(top = 64.dp, start = 20.dp, end = 20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Artwork(
-                        listOf(AppleRed, c.surface),
-                        Modifier
-                            .fillMaxWidth(0.66f)
-                            .aspectRatio(1f)
-                            .shadow(18.dp, RoundedCornerShape(12.dp)),
-                        corner = 12.dp,
-                        imageUrl = page.thumbnail,
-                    )
+                    // Kalau cover penuh sudah tampil di atas, kotak cover ini tidak perlu (supaya tidak dobel).
+                    if (page.thumbnail.isNullOrBlank()) {
+                        Artwork(
+                            listOf(AppleRed, c.surface),
+                            Modifier
+                                .fillMaxWidth(0.66f)
+                                .aspectRatio(1f)
+                                .shadow(18.dp, RoundedCornerShape(12.dp)),
+                            corner = 12.dp,
+                            imageUrl = page.thumbnail,
+                        )
+                    } else {
+                        Box(Modifier.fillMaxWidth(0.66f).aspectRatio(1f))
+                    }
                     Spacer(Modifier.height(18.dp))
                     Text(
                         page.title,
@@ -354,7 +359,7 @@ private fun ArtistBody(
 ) {
     val c = AppTheme.colors
     Box(Modifier.fillMaxSize()) {
-        PageBackdrop(page.thumbnail, null, fullCover = true)
+        PageBackdrop(page.thumbnail, null)
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 200.dp),
@@ -505,15 +510,20 @@ private fun PodcastBody(page: PodcastDetail, onPlay: (Song, List<Song>) -> Unit)
                         .padding(top = 64.dp, start = 20.dp, end = 20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Artwork(
-                        listOf(AppleRed, c.surface),
-                        Modifier
-                            .fillMaxWidth(0.66f)
-                            .aspectRatio(1f)
-                            .shadow(18.dp, RoundedCornerShape(12.dp)),
-                        corner = 12.dp,
-                        imageUrl = page.thumbnail,
-                    )
+                    // Kalau cover penuh sudah tampil di atas, kotak cover ini tidak perlu (supaya tidak dobel).
+                    if (page.thumbnail.isNullOrBlank()) {
+                        Artwork(
+                            listOf(AppleRed, c.surface),
+                            Modifier
+                                .fillMaxWidth(0.66f)
+                                .aspectRatio(1f)
+                                .shadow(18.dp, RoundedCornerShape(12.dp)),
+                            corner = 12.dp,
+                            imageUrl = page.thumbnail,
+                        )
+                    } else {
+                        Box(Modifier.fillMaxWidth(0.66f).aspectRatio(1f))
+                    }
                     Spacer(Modifier.height(18.dp))
                     Text(
                         page.title,
