@@ -39,7 +39,7 @@ object SyncedLyricsRepository {
                 "$BASE/get?track_name=${enc(cleanTitle)}&artist_name=${enc(artist)}" +
                     if (durationSec > 0) "&duration=$durationSec" else "",
             )
-            val synced = direct?.optString("syncedLyrics")?.takeIf { it.isNotBlank() }
+            val synced = direct?.lyricsOrNull("syncedLyrics")
                 ?: searchSynced("$cleanTitle $artist")
             synced?.let { parseLrc(it) }?.takeIf { it.isNotEmpty() }
         } catch (e: CancellationException) {
@@ -53,7 +53,7 @@ object SyncedLyricsRepository {
         val arr = getArray("$BASE/search?q=${enc(query)}") ?: return null
         for (i in 0 until arr.length()) {
             val item = arr.optJSONObject(i) ?: continue
-            val synced = item.optString("syncedLyrics").takeIf { it.isNotBlank() }
+            val synced = item.lyricsOrNull("syncedLyrics")
             if (synced != null) return synced
         }
         return null
@@ -78,6 +78,13 @@ object SyncedLyricsRepository {
     }
 
     private fun enc(s: String): String = URLEncoder.encode(s, "UTF-8")
+
+    /**
+     * Teks dari kunci [key], atau null kalau kunci tidak ada atau nilainya JSON null.
+     * Penting: optString() di Android mengubah JSON null menjadi teks "null", yang lolos isNotBlank().
+     */
+    private fun JSONObject.lyricsOrNull(key: String): String? =
+        if (isNull(key)) null else optString(key).takeIf { it.isNotBlank() }
 
     /** Membuang tambahan seperti "(Official Video)" atau "[Lyrics]" dari judul YouTube. */
     private fun cleanTitle(title: String): String =
