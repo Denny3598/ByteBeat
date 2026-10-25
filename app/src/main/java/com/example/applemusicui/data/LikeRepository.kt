@@ -9,6 +9,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -18,6 +19,8 @@ object LikeRepository {
     private const val LIKED_VIDEOS_ID = "FEmusic_liked_videos"
     private const val LIKE_API = "https://music.youtube.com/youtubei/v1/like/like?prettyPrint=false"
     private const val UNLIKE_API = "https://music.youtube.com/youtubei/v1/like/removelike?prettyPrint=false"
+    private const val SUBSCRIBE_API = "https://music.youtube.com/youtubei/v1/subscription/subscribe?prettyPrint=false"
+    private const val UNSUBSCRIBE_API = "https://music.youtube.com/youtubei/v1/subscription/unsubscribe?prettyPrint=false"
     private const val YT_ORIGIN = "https://music.youtube.com"
     private const val CLIENT_VERSION = "1.20241009.01.00"
     private const val USER_AGENT =
@@ -76,6 +79,47 @@ object LikeRepository {
                 .joinToString("") { "%02x".format(it) }
             val req = Request.Builder()
                 .url(if (liked) LIKE_API else UNLIKE_API)
+                .header("User-Agent", USER_AGENT)
+                .header("Origin", YT_ORIGIN)
+                .header("Referer", "$YT_ORIGIN/")
+                .header("X-YouTube-Client-Name", "67")
+                .header("X-YouTube-Client-Version", CLIENT_VERSION)
+                .header("Authorization", "SAPISIDHASH ${ts}_$hash")
+                .header("Cookie", cookie)
+                .header("X-Goog-AuthUser", "0")
+                .post(body.toString().toRequestBody(jsonType))
+                .build()
+
+            http.newCall(req).execute().use { it.isSuccessful }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /** Berlangganan artis (seperti "Subscribe" di YouTube Music), atau berhenti berlangganan. */
+    suspend fun setSubscribed(channelId: String, subscribe: Boolean): Boolean = withContext(Dispatchers.IO) {
+        if (!channelId.startsWith("UC")) return@withContext false
+        val cookie = CookieManager.getInstance().getCookie(YT_ORIGIN) ?: return@withContext false
+        val sapisid = sapisidOf(cookie) ?: return@withContext false
+
+        try {
+            val client = JSONObject()
+                .put("clientName", "WEB_REMIX")
+                .put("clientVersion", CLIENT_VERSION)
+                .put("hl", "id")
+                .put("gl", "ID")
+            val body = JSONObject()
+                .put("context", JSONObject().put("client", client))
+                .put("channelIds", JSONArray().put(channelId))
+
+            val ts = System.currentTimeMillis() / 1000
+            val hash = MessageDigest.getInstance("SHA-1")
+                .digest("$ts $sapisid $YT_ORIGIN".toByteArray())
+                .joinToString("") { "%02x".format(it) }
+            val req = Request.Builder()
+                .url(if (subscribe) SUBSCRIBE_API else UNSUBSCRIBE_API)
                 .header("User-Agent", USER_AGENT)
                 .header("Origin", YT_ORIGIN)
                 .header("Referer", "$YT_ORIGIN/")

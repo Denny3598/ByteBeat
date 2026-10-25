@@ -31,6 +31,8 @@ data class ArtistPage(
     val description: String?,
     val topSongs: List<Song>,
     val albums: List<LibraryItem>,
+    /** Sudah berlangganan (Subscribe) di akun YouTube Music. */
+    val subscribed: Boolean = false,
 )
 
 /** Satu episode podcast: lagu yang bisa diputar plus tanggal, durasi, dan deskripsinya. */
@@ -108,12 +110,15 @@ object DetailRepository {
             val t = textOf(r.optJSONObject("title")) ?: return@mapNotNull null
             LibraryItem(t, textOf(r.optJSONObject("subtitle")).orEmpty(), thumbUnder(r), id)
         }.distinctBy { it.browseId }
+        val subs = mutableListOf<JSONObject>()
+        collect(root, "subscribeButtonRenderer", subs)
         ArtistPage(
             name = name,
             thumbnail = thumb,
             description = description,
             topSongs = top,
             albums = albums,
+            subscribed = subs.firstOrNull()?.optBoolean("subscribed", false) ?: false,
         )
     }
 

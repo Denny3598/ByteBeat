@@ -28,6 +28,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.CircularProgressIndicator
@@ -38,6 +40,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,10 +62,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import com.example.applemusicui.data.AlbumPage
 import com.example.applemusicui.data.ArtistPage
+import com.example.applemusicui.data.AppPrefs
 import com.example.applemusicui.data.DetailRepository
 import com.example.applemusicui.data.LibraryItem
+import com.example.applemusicui.data.LikeRepository
 import com.example.applemusicui.data.PodcastDetail
 import com.example.applemusicui.data.PodcastEpisode
 import com.example.applemusicui.data.Song
@@ -154,7 +160,7 @@ fun DetailPageScreen(
                 // Hanya album (browse ID "MPRE...") yang memakai nomor urut; playlist dan lagu yang disukai memakai cover.
                 AlbumBody(s.page, onPlay, showNumbers = browseId.startsWith("MPRE"))
             }
-            is DetailState.Artist -> ArtistBody(s.page, onPlay, onOpenPage)
+            is DetailState.Artist -> ArtistBody(s.page, browseId, onPlay, onOpenPage)
             is DetailState.Podcast -> PodcastBody(s.page, onPlay)
         }
 
@@ -361,10 +367,13 @@ private fun AlbumBody(page: AlbumPage, onPlay: (Song, List<Song>) -> Unit, showN
 @Composable
 private fun ArtistBody(
     page: ArtistPage,
+    browseId: String,
     onPlay: (Song, List<Song>) -> Unit,
     onOpenPage: (String) -> Unit,
 ) {
     val c = AppTheme.colors
+    val scope = rememberCoroutineScope()
+    var subscribed by remember(page) { mutableStateOf(page.subscribed) }
     Box(Modifier.fillMaxSize()) {
         PageBackdrop(page.thumbnail, null)
         LazyColumn(
@@ -372,7 +381,7 @@ private fun ArtistBody(
             contentPadding = PaddingValues(bottom = 200.dp),
         ) {
             item {
-                // Foto artis yang memudar ke latar.
+                // Foto artis yang memudar ke transparan di bawah, sehingga menyatu dengan latar tanpa garis.
                 Box(
                     Modifier
                         .fillMaxWidth()
@@ -380,19 +389,21 @@ private fun ArtistBody(
                 ) {
                     Artwork(
                         listOf(AppleRed, c.surface),
-                        Modifier.fillMaxSize(),
+                        Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                            .drawWithContent {
+                                drawContent()
+                                drawRect(
+                                    brush = Brush.verticalGradient(
+                                        0.6f to Color.Black,
+                                        1f to Color.Transparent,
+                                    ),
+                                    blendMode = BlendMode.DstIn,
+                                )
+                            },
                         corner = 0.dp,
                         imageUrl = page.thumbnail,
-                    )
-                    Box(
-                        Modifier
-                            .matchParentSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    0.5f to Color.Transparent,
-                                    1f to c.background,
-                                ),
-                            ),
                     )
                 }
             }
@@ -455,7 +466,33 @@ private fun ArtistBody(
                                 modifier = Modifier.size(36.dp),
                             )
                         }
-                        Box(Modifier.weight(1f))
+                        // Tombol favorit (Subscribe di YouTube Music), di kanan tombol Putar. Hanya saat sudah login.
+                        Box(Modifier.weight(1f).padding(start = 16.dp), contentAlignment = Alignment.CenterStart) {
+                            if (AppPrefs.isLoggedIn()) {
+                                Box(
+                                    Modifier
+                                        .size(52.dp)
+                                        .clip(CircleShape)
+                                        .background(c.textSecondary.copy(alpha = 0.15f))
+                                        .clickable {
+                                            val next = !subscribed
+                                            subscribed = next
+                                            scope.launch {
+                                                val ok = LikeRepository.setSubscribed(browseId, next)
+                                                if (!ok) subscribed = !next
+                                            }
+                                        },
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        if (subscribed) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                        contentDescription = if (subscribed) "Berhenti langganan" else "Langganan",
+                                        tint = c.text,
+                                        modifier = Modifier.size(22.dp),
+                                    )
+                                }
+                            }
+                        }
                     }
                     page.description?.let { desc ->
                         Text(
