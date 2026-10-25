@@ -209,7 +209,7 @@ private fun ErrorBody(message: String, onRetry: () -> Unit) {
  * Kalau belum, dipakai cover yang di-blur seperti sebelumnya.
  */
 @Composable
-private fun BoxScope.PageBackdrop(imageUrl: String?, tint: Color?) {
+private fun BoxScope.PageBackdrop(imageUrl: String?, tint: Color?, fullCover: Boolean = false) {
     val c = AppTheme.colors
     if (tint != null) {
         Box(
@@ -224,28 +224,58 @@ private fun BoxScope.PageBackdrop(imageUrl: String?, tint: Color?) {
                     ),
                 ),
         )
-        return
-    }
-    Artwork(
-        listOf(AppleRed, c.surface),
-        Modifier
-            .matchParentSize()
-            .blur(60.dp),
-        corner = 0.dp,
-        imageUrl = imageUrl,
-    )
-    Box(
-        Modifier
-            .matchParentSize()
-            .background(
-                Brush.verticalGradient(
-                    0f to c.background.copy(alpha = 0.45f),
-                    0.55f to c.background.copy(alpha = 0.9f),
-                    1f to c.background,
+    } else {
+        Artwork(
+            listOf(AppleRed, c.surface),
+            Modifier
+                .matchParentSize()
+                .blur(60.dp),
+            corner = 0.dp,
+            imageUrl = imageUrl,
+        )
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to c.background.copy(alpha = 0.45f),
+                        0.55f to c.background.copy(alpha = 0.9f),
+                        1f to c.background,
+                    ),
                 ),
-            ),
-    )
+        )
+    }
+
+    // Cover penuh di bagian atas (tanpa blur), lalu memudar ke warna latar di bawahnya.
+    if (fullCover && !imageUrl.isNullOrBlank()) {
+        Box(
+            Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .height(COVER_HEIGHT),
+        ) {
+            Artwork(
+                listOf(AppleRed, c.surface),
+                Modifier.matchParentSize(),
+                corner = 0.dp,
+                imageUrl = imageUrl,
+            )
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            0.55f to Color.Transparent,
+                            1f to c.background,
+                        ),
+                    ),
+            )
+        }
+    }
 }
+
+private val COVER_HEIGHT = 460.dp
 
 @Composable
 private fun AlbumBody(page: AlbumPage, onPlay: (Song, List<Song>) -> Unit, showNumbers: Boolean = true) {
@@ -255,7 +285,7 @@ private fun AlbumBody(page: AlbumPage, onPlay: (Song, List<Song>) -> Unit, showN
     val tint = rememberCoverTint(page.thumbnail)
 
     Box(Modifier.fillMaxSize()) {
-        PageBackdrop(page.thumbnail, tint)
+        PageBackdrop(page.thumbnail, tint, fullCover = true)
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 200.dp),
@@ -462,7 +492,7 @@ private fun PodcastBody(page: PodcastDetail, onPlay: (Song, List<Song>) -> Unit)
     val tint = rememberCoverTint(page.thumbnail)
 
     Box(Modifier.fillMaxSize()) {
-        PageBackdrop(page.thumbnail, tint)
+        PageBackdrop(page.thumbnail, tint, fullCover = true)
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 200.dp),
