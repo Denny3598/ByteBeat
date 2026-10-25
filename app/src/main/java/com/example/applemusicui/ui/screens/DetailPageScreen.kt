@@ -354,7 +354,7 @@ private fun ArtistBody(
 ) {
     val c = AppTheme.colors
     Box(Modifier.fillMaxSize()) {
-        PageBackdrop(page.thumbnail, null)
+        PageBackdrop(page.thumbnail, null, fullCover = true)
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 200.dp),
