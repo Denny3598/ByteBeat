@@ -2,62 +2,64 @@ package com.example.applemusicui.ui.screens
 
 import android.content.Context
 import android.content.Intent
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.applemusicui.data.LyricsRepository
-import com.example.applemusicui.data.Song
-import com.example.applemusicui.ui.playback.PlaybackController
-import com.example.applemusicui.ui.theme.AppTheme
-import kotlinx.coroutines.CancellationException
-import androidx.compose.foundation.clickable
-import androidx.compose.ui.Alignment
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.ui.draw.alpha
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.layout.offset
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.zIndex
-import kotlin.math.roundToInt
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import com.example.applemusicui.data.LyricsRepository
+import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.components.Artwork
+import com.example.applemusicui.ui.playback.PlaybackController
+import com.example.applemusicui.ui.playback.QueueEntry
 import com.example.applemusicui.ui.playback.QueueSection
+import com.example.applemusicui.ui.theme.AppTheme
 import com.example.applemusicui.ui.theme.AppleRed
+import kotlinx.coroutines.CancellationException
+import kotlin.math.abs
 
 /** Sheet yang bisa dibuka dari pemutar penuh. */
 enum class NowSheet { Lyrics, Queue }
@@ -121,8 +123,22 @@ fun LyricsSheet(song: Song, onDismiss: () -> Unit) {
 }
 
 /**
+ * Keadaan satu drag di antrean. Baris yang dipegang digambar sebagai overlay di atas daftar,
+ * mengikuti jari; posisinya di daftar ditukar langsung setiap kali melewati tetangganya.
+ * Diadaptasi dari BitChord (GPL v3).
+ */
+private class QueueDragState {
+    var heldId by mutableStateOf<Long?>(null)
+    var heldTop by mutableFloatStateOf(0f)
+    var heldCenter = 0f
+    var heldSize = 0
+    /** Posisi atas baris yang dipegang saat tukar terakhir. Tukar baru dicek lagi setelah posisinya berubah. */
+    var lastSwapOffset: Int? = null
+}
+
+/**
  * Antrean seperti BitChord: riwayat, lagu yang sedang diputar, lalu lagu berikutnya yang ditambahkan
- * pengguna (bisa dinaikkan, diturunkan, atau dihapus), daftar asal, dan AutoPlay.
+ * pengguna (bisa ditarik untuk diatur urutannya, dihapus, atau dikosongkan), daftar asal, dan AutoPlay.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -130,135 +146,226 @@ fun QueueSheet(controller: PlaybackController, onDismiss: () -> Unit) {
     val c = AppTheme.colors
     val entries = controller.entries
     val now = controller.currentIndex
+    val listState = rememberLazyListState()
+    val drag = remember { QueueDragState() }
     val hasUpcomingUser = entries.withIndex().any { it.index > now && it.value.section == QueueSection.USER }
-    var dragFrom by remember { mutableStateOf<Int?>(null) }
-    var dragDy by remember { mutableFloatStateOf(0f) }
-    var rowHeightPx by remember { mutableFloatStateOf(0f) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = c.surface) {
-        LazyColumn(
-            Modifier.heightIn(max = 620.dp),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-        ) {
-            item {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "Antrean",
-                        color = c.text,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (hasUpcomingUser) {
+        Box(Modifier.fillMaxWidth().heightIn(max = 620.dp)) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+            ) {
+                item {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            "Kosongkan",
-                            color = AppleRed,
+                            "Antrean",
+                            color = c.text,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (hasUpcomingUser) {
+                            Text(
+                                "Kosongkan",
+                                color = AppleRed,
+                                fontSize = 15.sp,
+                                modifier = Modifier
+                                    .clickable { controller.clearUserUpcoming() }
+                                    .padding(8.dp),
+                            )
+                        }
+                    }
+                }
+                if (entries.isEmpty()) {
+                    item {
+                        Text(
+                            "Antrean masih kosong.",
+                            color = c.textSecondary,
                             fontSize = 15.sp,
-                            modifier = Modifier
-                                .clickable { controller.clearUserUpcoming() }
-                                .padding(8.dp),
+                            modifier = Modifier.padding(vertical = 12.dp),
                         )
                     }
                 }
-            }
-            if (entries.isEmpty()) {
-                item {
-                    Text(
-                        "Antrean masih kosong.",
-                        color = c.textSecondary,
-                        fontSize = 15.sp,
-                        modifier = Modifier.padding(vertical = 12.dp),
-                    )
-                }
-            }
 
-            // Riwayat: lagu yang sudah diputar, paling lama di atas.
-            val past = entries.withIndex().filter { it.index < now }.takeLast(20)
-            if (past.isNotEmpty()) {
-                item { QueueHeading("Riwayat") }
-                items(past, key = { "past-${it.index}" }) { indexed ->
-                    QueueRow(indexed.value.song, highlighted = false, dim = true, onClick = { controller.jumpTo(indexed.index) }) {}
-                }
-            }
-
-            // Yang sedang diputar.
-            entries.getOrNull(now)?.let { entry ->
-                item { QueueHeading("Sedang diputar") }
-                item(key = "now") {
-                    QueueRow(entry.song, highlighted = true, dim = false, onClick = {}) {
-                        Icon(Icons.Filled.GraphicEq, contentDescription = null, tint = AppleRed, modifier = Modifier.size(20.dp))
+                // Riwayat: lagu yang sudah diputar, paling lama di atas.
+                val past = entries.withIndex().filter { it.index < now }.takeLast(20)
+                if (past.isNotEmpty()) {
+                    item(key = "heading-past") { QueueHeading("Riwayat") }
+                    items(past, key = { it.value.id }) { indexed ->
+                        QueueRow(
+                            indexed.value.song,
+                            highlighted = false,
+                            dim = true,
+                            onClick = { controller.jumpTo(indexed.index) },
+                            modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = tween(200)),
+                        ) {}
                     }
                 }
-            }
 
-            // Yang akan datang, per bagian.
-            val sections = listOf(
-                QueueSection.USER to "Berikutnya",
-                QueueSection.CONTEXT to "Dari daftar",
-                QueueSection.AUTOPLAY to "AutoPlay",
-            )
-            for ((section, label) in sections) {
-                val upcoming = entries.withIndex().filter { it.index > now && it.value.section == section }
-                if (upcoming.isEmpty()) continue
-                item { QueueHeading(label) }
-                items(upcoming, key = { "up-${section.name}-${it.index}" }) { indexed ->
-                    val i = indexed.index
-                    val isDragging = dragFrom == i
-                    QueueRow(
-                        indexed.value.song,
-                        highlighted = false,
-                        dim = false,
-                        onClick = { controller.jumpTo(i) },
-                        modifier = Modifier
-                            .zIndex(if (isDragging) 1f else 0f)
-                            .offset { IntOffset(0, if (isDragging) dragDy.roundToInt() else 0) }
-                            .onSizeChanged { rowHeightPx = it.height.toFloat() },
-                    ) {
-                        if (section == QueueSection.USER) {
-                            // Tahan pegangan lalu geser untuk mengatur urutan lagu berikutnya.
-                            Box(
-                                Modifier
-                                    .size(36.dp)
-                                    .pointerInput(i) {
-                                        detectDragGesturesAfterLongPress(
-                                            onDragStart = {
-                                                dragFrom = i
-                                                dragDy = 0f
-                                            },
-                                            onDrag = { change, amount ->
-                                                change.consume()
-                                                dragDy += amount.y
-                                            },
-                                            onDragEnd = {
-                                                val steps = if (rowHeightPx > 0f) (dragDy / rowHeightPx).roundToInt() else 0
-                                                if (steps != 0) controller.moveUserUpcomingBy(i, steps)
-                                                dragFrom = null
-                                                dragDy = 0f
-                                            },
-                                            onDragCancel = {
-                                                dragFrom = null
-                                                dragDy = 0f
-                                            },
-                                        )
-                                    },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    Icons.Filled.DragHandle,
-                                    contentDescription = "Geser untuk mengatur urutan",
-                                    tint = AppTheme.colors.textSecondary,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
+                // Yang sedang diputar.
+                entries.getOrNull(now)?.let { entry ->
+                    item(key = "heading-now") { QueueHeading("Sedang diputar") }
+                    item(key = entry.id) {
+                        QueueRow(
+                            entry.song,
+                            highlighted = true,
+                            dim = false,
+                            onClick = {},
+                            modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = tween(200)),
+                        ) {
+                            Icon(Icons.Filled.GraphicEq, contentDescription = null, tint = AppleRed, modifier = Modifier.size(20.dp))
                         }
-                        QueueAction(Icons.Filled.Close, "Hapus") { controller.removeUpcoming(i) }
+                    }
+                }
+
+                // Yang akan datang, per bagian.
+                val sections = listOf(
+                    QueueSection.USER to "Berikutnya",
+                    QueueSection.CONTEXT to "Dari daftar",
+                    QueueSection.AUTOPLAY to "AutoPlay",
+                )
+                for ((section, label) in sections) {
+                    val upcoming = entries.withIndex().filter { it.index > now && it.value.section == section }
+                    if (upcoming.isEmpty()) continue
+                    item(key = "heading-${section.name}") { QueueHeading(label) }
+                    itemsIndexed(upcoming, key = { _, indexed -> indexed.value.id }) { _, indexed ->
+                        val entry = indexed.value
+                        val i = indexed.index
+                        val isHeld = drag.heldId == entry.id
+                        QueueRow(
+                            entry.song,
+                            highlighted = false,
+                            dim = false,
+                            onClick = { controller.jumpTo(i) },
+                            modifier = Modifier
+                                .animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = tween(200))
+                                .alpha(if (isHeld) 0f else 1f)
+                        ) {
+                            if (section == QueueSection.USER) {
+                                QueueDragHandle(entry.id, listState, drag, controller)
+                            }
+                            QueueAction(Icons.Filled.Close, "Hapus") { controller.removeUpcoming(i) }
+                        }
+                    }
+                }
+
+                item(key = "bottom-spacer") { Spacer(Modifier.height(24.dp)) }
+            }
+
+            // Baris yang sedang ditarik, digambar di atas daftar tepat di bawah jari.
+            drag.heldId?.let { id ->
+                entries.firstOrNull { it.id == id }?.let { entry ->
+                    Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp).zIndex(1f)) {
+                        QueueRow(
+                            entry.song,
+                            highlighted = false,
+                            dim = false,
+                            onClick = {},
+                            modifier = Modifier
+                                .offset { IntOffset(0, drag.heldTop.toInt()) }
+                                .background(c.surface),
+                        ) {
+                            Icon(
+                                Icons.Filled.DragHandle,
+                                contentDescription = null,
+                                tint = c.textSecondary,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
                     }
                 }
             }
-
-            item { Spacer(Modifier.height(24.dp)) }
         }
     }
+}
+
+/**
+ * Pegangan untuk menarik lagu berikutnya. Tahan lalu geser; baris akan menukar posisi dengan
+ * tetangganya setiap kali melewatinya, dan perubahan langsung dikirim ke pemutar.
+ */
+@Composable
+private fun QueueDragHandle(
+    entryId: Long,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    drag: QueueDragState,
+    controller: PlaybackController,
+) {
+    Box(
+        Modifier
+            .size(36.dp)
+            .pointerInput(entryId) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = {
+                        val item = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == entryId }
+                            ?: return@detectDragGesturesAfterLongPress
+                        drag.heldId = entryId
+                        drag.heldSize = item.size
+                        drag.heldCenter = item.offset + item.size / 2f
+                        drag.heldTop = item.offset.toFloat()
+                        drag.lastSwapOffset = null
+                    },
+                    onDrag = { change, amount ->
+                        change.consume()
+                        if (drag.heldId != entryId) return@detectDragGesturesAfterLongPress
+                        drag.heldCenter += amount.y
+                        drag.heldTop = drag.heldCenter - drag.heldSize / 2f
+                        swapWithNeighbour(entryId, listState, drag, controller)
+                    },
+                    onDragEnd = { endDrag(drag, entryId) },
+                    onDragCancel = { endDrag(drag, entryId) },
+                )
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Filled.DragHandle,
+            contentDescription = "Geser untuk mengatur urutan",
+            tint = AppTheme.colors.textSecondary,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
+private fun endDrag(drag: QueueDragState, entryId: Long) {
+    if (drag.heldId != entryId) return
+    drag.heldId = null
+    drag.lastSwapOffset = null
+}
+
+/**
+ * Menukar baris yang dipegang dengan tetangga terdekat yang juga lagu berikutnya dari pengguna,
+ * kalau pusat baris sudah melewati setengah tinggi tetangganya.
+ */
+private fun swapWithNeighbour(
+    entryId: Long,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    drag: QueueDragState,
+    controller: PlaybackController,
+) {
+    val info = listState.layoutInfo
+    val held = info.visibleItemsInfo.firstOrNull { it.key == entryId } ?: return
+    // Tukar sebelumnya belum tampil di layout: jangan memutuskan lagi berdasarkan layout yang lama.
+    drag.lastSwapOffset?.let { if (held.offset == it) return }
+    drag.lastSwapOffset = null
+
+    val entriesById: Map<Long, QueueEntry> = controller.entries.associateBy { it.id }
+    val target = info.visibleItemsInfo
+        .filter { item ->
+            val id = item.key as? Long ?: return@filter false
+            id != entryId && entriesById[id]?.section == QueueSection.USER
+        }
+        .minByOrNull { abs(it.offset + it.size / 2f - drag.heldCenter) }
+        ?: return
+    // Setengah tinggi baris per tukar, supaya baris tidak bolak-balik karena beda satu piksel.
+    if (abs(drag.heldCenter - (target.offset + target.size / 2f)) > target.size / 2f) return
+
+    val index = controller.entries.indexOfFirst { it.id == entryId }
+    if (index < 0) return
+    val dir = if (target.offset > held.offset) 1 else -1
+    controller.moveUserUpcomingBy(index, dir)
+    drag.lastSwapOffset = held.offset
 }
 
 @Composable
@@ -279,7 +386,7 @@ private fun QueueRow(
     dim: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    trailing: @Composable RowScope.() -> Unit,
+    trailing: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
 ) {
     val c = AppTheme.colors
     Row(
