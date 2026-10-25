@@ -36,7 +36,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,7 +49,6 @@ import androidx.compose.ui.unit.sp
 import com.example.applemusicui.data.AppPrefs
 import com.example.applemusicui.data.DummyData
 import com.example.applemusicui.data.FavoritesStore
-import com.example.applemusicui.data.LibraryRepository
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.components.AppTab
 import com.example.applemusicui.ui.components.LocalOnAvatarClick
@@ -69,7 +67,6 @@ import com.example.applemusicui.ui.screens.AboutScreen
 import com.example.applemusicui.ui.components.UpdateDialog
 import com.example.applemusicui.data.UpdateInfo
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import com.example.applemusicui.data.UpdateRepository
 import com.example.applemusicui.ui.screens.CategoryScreen
 import com.example.applemusicui.ui.screens.categoryKey
@@ -82,12 +79,14 @@ import com.example.applemusicui.ui.screens.SettingsScreen
 import com.example.applemusicui.ui.theme.AppTheme
 import com.example.applemusicui.ui.theme.ThemeMode
 
+/** Halaman "Lagu yang kamu suka" di YouTube Music. */
+private const val LIKED_SONGS_ID = "FEmusic_liked_videos"
+
 @Composable
 fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
     val context = LocalContext.current
     // Satu controller untuk seluruh proses; tidak dilepas saat UI ditutup, supaya antrean tetap jalan.
     val controller = remember { PlaybackController.get(context.applicationContext) }
-    val scope = rememberCoroutineScope()
 
     var tab by rememberSaveable { mutableStateOf(AppTab.Home) }
     var showNowPlaying by rememberSaveable { mutableStateOf(false) }
@@ -307,14 +306,9 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
                         showAccount = false
                         tab = AppTab.Library
                     },
-                    onPlayLiked = {
+                    onOpenLiked = {
                         showAccount = false
-                        scope.launch {
-                            val songs = runCatching { LibraryRepository.tracks("FEmusic_liked_videos") }
-                                .getOrDefault(emptyList())
-                            val first = songs.firstOrNull()
-                            if (first != null) play(first, songs) else tab = AppTab.Library
-                        }
+                        openPage(LIKED_SONGS_ID)
                     },
                 )
             }

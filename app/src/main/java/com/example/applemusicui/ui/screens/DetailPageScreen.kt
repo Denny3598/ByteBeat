@@ -147,8 +147,8 @@ fun DetailPageScreen(
                     onPlay,
                 )
             } else {
-                // Playlist (browse ID "VL...") memakai cover di setiap baris; album tetap memakai nomor urut.
-                AlbumBody(s.page, onPlay, showNumbers = !browseId.startsWith("VL"))
+                // Hanya album (browse ID "MPRE...") yang memakai nomor urut; playlist dan lagu yang disukai memakai cover.
+                AlbumBody(s.page, onPlay, showNumbers = browseId.startsWith("MPRE"))
             }
             is DetailState.Artist -> ArtistBody(s.page, onPlay, onOpenPage)
             is DetailState.Podcast -> PodcastBody(s.page, onPlay)

@@ -52,7 +52,7 @@ fun AccountScreen(
     onLogin: () -> Unit,
     onLogout: () -> Unit,
     onOpenLibrary: () -> Unit = {},
-    onPlayLiked: () -> Unit = {},
+    onOpenLiked: () -> Unit = {},
 ) {
     val c = AppTheme.colors
     // Profil (nama dan foto) diambil dari YouTube Music saat sudah login.
@@ -174,7 +174,7 @@ fun AccountScreen(
                 .background(c.surface),
         ) {
             InfoRow(Icons.Filled.PlaylistPlay, "Playlist dan pustaka", onClick = onOpenLibrary)
-            InfoRow(Icons.Filled.Favorite, "Lagu yang kamu suka", onClick = onPlayLiked)
+            InfoRow(Icons.Filled.Favorite, "Lagu yang kamu suka", onClick = onOpenLiked)
         }
 
         Text(
