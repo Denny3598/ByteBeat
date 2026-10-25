@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -167,6 +169,18 @@ private fun SyncedLyricsDialog(
                         }
                     }
                     itemsIndexed(lines) { i, line ->
+                        if (line.isGap) {
+                            // Jeda instrumental: tiga titik yang menyala bergantian sepanjang jeda, seperti BitChord.
+                            val until = lines.getOrNull(i + 1)?.timeMs ?: (line.timeMs + MIN_GAP_DISPLAY_MS)
+                            val frac = ((controller.positionMs + offsetMs - line.timeMs).toFloat() /
+                                (until - line.timeMs).coerceAtLeast(1L)).coerceIn(0f, 1f)
+                            InterludeDots(
+                                active = i == activeIndex,
+                                progress = frac,
+                                onClick = { controller.seekTo((line.timeMs - offsetMs).coerceAtLeast(0L)) },
+                            )
+                            return@itemsIndexed
+                        }
                         val dist = if (activeIndex < 0) 3 else abs(i - activeIndex)
                         val alpha by animateFloatAsState(
                             when (dist) {
@@ -253,6 +267,40 @@ private fun OffsetButton(label: String, onClick: () -> Unit) {
         Text(label, color = c.text, fontSize = 13.sp)
     }
 }
+
+/**
+ * Jeda instrumental. Baris ini membuka saat jeda aktif dan menutup saat tidak, supaya
+ * tidak ada ruang kosong di antara bait. Titik-titiknya menyala satu per satu sesuai [progress].
+ * Diadaptasi dari BitChord (GPL v3).
+ */
+@Composable
+private fun InterludeDots(active: Boolean, progress: Float, onClick: () -> Unit) {
+    val c = AppTheme.colors
+    val rowHeight by animateDpAsState(if (active) 48.dp else 12.dp, label = "gapHeight")
+    val dot by animateDpAsState(if (active) 12.dp else 8.dp, label = "gapDot")
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(rowHeight)
+            .padding(horizontal = 24.dp)
+            .clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(3) { k ->
+            val lit = progress >= k / 3f
+            Box(
+                Modifier
+                    .padding(end = 10.dp)
+                    .size(dot)
+                    .clip(CircleShape)
+                    .background(c.text.copy(alpha = if (lit) 1f else 0.25f)),
+            )
+        }
+    }
+}
+
+/** Panjang jeda yang dipakai kalau baris jeda terakhir tidak punya baris berikutnya. */
+private const val MIN_GAP_DISPLAY_MS = 4_000L
 
 /** Teks dengan kata-kata yang sudah lewat tampil terang, sisanya redup. */
 private fun sweptText(text: String, frac: Float, bright: Color): AnnotatedString {
