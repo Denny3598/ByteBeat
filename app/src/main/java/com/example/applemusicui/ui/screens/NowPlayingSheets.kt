@@ -42,11 +42,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.item
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.zIndex
+import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import com.example.applemusicui.ui.components.Artwork
@@ -125,6 +132,9 @@ fun QueueSheet(controller: PlaybackController, onDismiss: () -> Unit) {
     val entries = controller.entries
     val now = controller.currentIndex
     val hasUpcomingUser = entries.withIndex().any { it.index > now && it.value.section == QueueSection.USER }
+    var dragFrom by remember { mutableStateOf<Int?>(null) }
+    var dragDy by remember { mutableFloatStateOf(0f) }
+    var rowHeightPx by remember { mutableFloatStateOf(0f) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = c.surface) {
         LazyColumn(
@@ -194,10 +204,53 @@ fun QueueSheet(controller: PlaybackController, onDismiss: () -> Unit) {
                 item { QueueHeading(label) }
                 items(upcoming, key = { "up-${section.name}-${it.index}" }) { indexed ->
                     val i = indexed.index
-                    QueueRow(indexed.value.song, highlighted = false, dim = false, onClick = { controller.jumpTo(i) }) {
+                    val isDragging = dragFrom == i
+                    QueueRow(
+                        indexed.value.song,
+                        highlighted = false,
+                        dim = false,
+                        onClick = { controller.jumpTo(i) },
+                        modifier = Modifier
+                            .zIndex(if (isDragging) 1f else 0f)
+                            .offset { IntOffset(0, if (isDragging) dragDy.roundToInt() else 0) }
+                            .onSizeChanged { rowHeightPx = it.height.toFloat() },
+                    ) {
                         if (section == QueueSection.USER) {
-                            QueueAction(Icons.Filled.KeyboardArrowUp, "Naikkan") { controller.moveUserUpcoming(i, -1) }
-                            QueueAction(Icons.Filled.KeyboardArrowDown, "Turunkan") { controller.moveUserUpcoming(i, 1) }
+                            // Tahan pegangan lalu geser untuk mengatur urutan lagu berikutnya.
+                            Box(
+                                Modifier
+                                    .size(36.dp)
+                                    .pointerInput(i) {
+                                        detectDragGesturesAfterLongPress(
+                                            onDragStart = {
+                                                dragFrom = i
+                                                dragDy = 0f
+                                            },
+                                            onDrag = { change, amount ->
+                                                change.consume()
+                                                dragDy += amount.y
+                                            },
+                                            onDragEnd = {
+                                                val steps = if (rowHeightPx > 0f) (dragDy / rowHeightPx).roundToInt() else 0
+                                                if (steps != 0) controller.moveUserUpcomingBy(i, steps)
+                                                dragFrom = null
+                                                dragDy = 0f
+                                            },
+                                            onDragCancel = {
+                                                dragFrom = null
+                                                dragDy = 0f
+                                            },
+                                        )
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Filled.DragHandle,
+                                    contentDescription = "Geser untuk mengatur urutan",
+                                    tint = AppTheme.colors.textSecondary,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
                         }
                         QueueAction(Icons.Filled.Close, "Hapus") { controller.removeUpcoming(i) }
                     }
@@ -226,11 +279,12 @@ private fun QueueRow(
     highlighted: Boolean,
     dim: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     trailing: @Composable RowScope.() -> Unit,
 ) {
     val c = AppTheme.colors
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .alpha(if (dim) 0.55f else 1f)
             .clickable(onClick = onClick)

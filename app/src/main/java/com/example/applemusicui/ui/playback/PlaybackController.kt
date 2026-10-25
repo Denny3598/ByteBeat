@@ -28,6 +28,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.abs
 
 /** Bagian antrean: dari mana sebuah lagu masuk. */
 enum class QueueSection { USER, CONTEXT, AUTOPLAY }
@@ -259,14 +260,22 @@ class PlaybackController private constructor(context: Context) {
         queue.removeAt(index)
     }
 
-    /** Menukar posisi dua lagu USER yang belum diputar (naik atau turun satu langkah). */
-    fun moveUserUpcoming(index: Int, delta: Int) {
-        val to = index + delta
-        if (index <= currentIndex || to <= currentIndex) return
-        if (index !in queue.indices || to !in queue.indices) return
-        if (queue[index].section != QueueSection.USER || queue[to].section != QueueSection.USER) return
-        val item = queue.removeAt(index)
-        queue.add(to, item)
+    /**
+     * Memindahkan lagu USER yang belum diputar sejauh [steps] posisi (positif = ke bawah).
+     * Berhenti kalau bertemu lagu yang bukan USER atau yang sudah diputar.
+     */
+    fun moveUserUpcomingBy(index: Int, steps: Int) {
+        if (steps == 0) return
+        val dir = if (steps > 0) 1 else -1
+        var at = index
+        repeat(abs(steps)) {
+            val to = at + dir
+            if (at <= currentIndex || to <= currentIndex || to !in queue.indices) return
+            if (queue[at].section != QueueSection.USER || queue[to].section != QueueSection.USER) return
+            val item = queue.removeAt(at)
+            queue.add(to, item)
+            at = to
+        }
     }
 
     /** Mengosongkan lagu USER yang belum diputar. */
