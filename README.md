@@ -9,3 +9,8 @@ ByteBeat bridges the gap between YouTube Music's extensive library and Apple Mus
 * **Apple Music UI Design:** Dark mode theme, smooth transitions, floating mini-player, and pill-style navigation tabs.
 * **Powered by YouTube Music:** Stream millions of songs directly from the YouTube Music backend.
 * **Modern Android Tech Stack:** Fully written in Kotlin using Jetpack Compose for declarative UI rendering.
+
+## 📜 License
+ByteBeat dirilis di bawah **GNU General Public License v3.0 (GPLv3)**. Lihat berkas [LICENSE](LICENSE).
+
+Sebagian kode lirik dan antrean diadaptasi dari [BitChord](https://github.com/kushagrasinghx/BitChord), juga di bawah GPLv3.
