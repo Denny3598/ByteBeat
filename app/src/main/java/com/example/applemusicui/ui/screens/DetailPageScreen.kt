@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -307,8 +308,8 @@ private fun AlbumBody(page: AlbumPage, onPlay: (Song, List<Song>) -> Unit) {
                     Spacer(Modifier.height(16.dp))
                 }
             }
-            items(songs) { song ->
-                TrackRow(song = song) { onPlay(song, songs) }
+            itemsIndexed(songs) { index, song ->
+                TrackRow(song = song, number = index + 1) { onPlay(song, songs) }
             }
         }
     }
@@ -717,10 +718,13 @@ private fun SectionTitle(title: String) {
     )
 }
 
-/** Satu baris lagu dengan cover kecil di kiri, seperti daftar lagu di aplikasi musik modern. */
+/**
+ * Satu baris lagu. Kalau [number] diisi (halaman album), kolom kiri berupa nomor urut.
+ * Kalau tidak, kolom kiri tetap cover kecil seperti sebelumnya.
+ */
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
-private fun TrackRow(song: Song, onClick: () -> Unit) {
+private fun TrackRow(song: Song, number: Int? = null, onClick: () -> Unit) {
     val c = AppTheme.colors
     var menu by remember { mutableStateOf<SongMenuStyle?>(null) }
     Column {
@@ -731,12 +735,27 @@ private fun TrackRow(song: Song, onClick: () -> Unit) {
                 .padding(horizontal = 20.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Artwork(
-                listOf(AppleRed, c.surface),
-                Modifier.size(52.dp),
-                corner = 6.dp,
-                imageUrl = song.thumbnail,
-            )
+            if (number != null) {
+                // Nomor urut, lebarnya sama dengan cover supaya garis pemisah tetap sejajar.
+                Box(
+                    Modifier.width(52.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        number.toString(),
+                        color = c.textSecondary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            } else {
+                Artwork(
+                    listOf(AppleRed, c.surface),
+                    Modifier.size(52.dp),
+                    corner = 6.dp,
+                    imageUrl = song.thumbnail,
+                )
+            }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(
