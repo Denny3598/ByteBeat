@@ -225,10 +225,9 @@ class PlaybackController private constructor(context: Context) {
         autoplayJob = scope.launch {
             val more = runCatching { withContext(Dispatchers.IO) { SongExtras.radio(videoId) } }
                 .getOrDefault(emptyList())
-            val existing = queue.map { it.song.url }.toMutableSet()
-            more.forEach { song ->
-                if (existing.add(song.url)) queue.add(QueueEntry(song, QueueSection.AUTOPLAY))
-            }
+            // Tanpa lagu yang sama dua kali, dan tanpa satu artis mendominasi (lihat QueueBuilder).
+            val picked = QueueBuilder.extend(queue.map { it.song }, more, limit = more.size)
+            picked.forEach { queue.add(QueueEntry(it, QueueSection.AUTOPLAY)) }
         }
     }
 
@@ -301,9 +300,9 @@ class PlaybackController private constructor(context: Context) {
         jumpTo((currentIndex + 1) % queue.size)
     }
 
-    /** Seperti Apple Music: kalau sudah lewat 3 detik, ulang dari awal. */
+    /** Seperti BitChord: kalau sudah lewat 10 detik, ulang dari awal. */
     fun previous() {
-        if (positionMs > 3_000L) {
+        if (positionMs > BACK_RESTARTS_AFTER_MS) {
             seekTo(0L)
             return
         }
