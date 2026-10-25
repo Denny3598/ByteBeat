@@ -20,7 +20,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.ChevronRight
@@ -60,9 +59,7 @@ import com.example.applemusicui.ui.theme.ThemeMode
 fun SettingsScreen(
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
-    loggedIn: Boolean,
     onBack: () -> Unit,
-    onOpenAccount: () -> Unit,
     onOpenAbout: () -> Unit,
 ) {
     val c = AppTheme.colors
@@ -101,16 +98,6 @@ fun SettingsScreen(
             fontWeight = FontWeight.Bold,
             letterSpacing = (-0.5).sp,
         )
-
-        SectionLabel("Akun")
-        SettingsCard {
-            SettingsRow(
-                icon = Icons.Filled.AccountCircle,
-                title = "Akun",
-                value = if (loggedIn) "Terhubung" else "Belum masuk",
-                onClick = onOpenAccount,
-            )
-        }
 
         SectionLabel("Kualitas audio")
         SettingsCard {

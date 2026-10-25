@@ -272,9 +272,7 @@ fun AppRoot(themeMode: ThemeMode, onThemeModeChange: (ThemeMode) -> Unit) {
                 SettingsScreen(
                     themeMode = themeMode,
                     onThemeModeChange = onThemeModeChange,
-                    loggedIn = loggedIn,
                     onBack = { showSettings = false },
-                    onOpenAccount = { showAccount = true },
                     onOpenAbout = { showAbout = true },
                 )
             }
