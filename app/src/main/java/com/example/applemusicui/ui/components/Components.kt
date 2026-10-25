@@ -6,7 +6,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -326,43 +331,61 @@ enum class AppTab(val label: String, val icon: ImageVector) {
 fun PillTabBar(selected: AppTab, onSelect: (AppTab) -> Unit, modifier: Modifier = Modifier) {
     val c = AppTheme.colors
     val barShape = RoundedCornerShape(36.dp)
-    Row(
+    Box(
         modifier
             .fillMaxWidth()
             .height(72.dp)
             .clip(barShape)
             .background(c.glass)
-            .border(1.dp, c.glassBorder, barShape)
-            .padding(6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .border(1.dp, c.glassBorder, barShape),
     ) {
-        AppTab.entries.forEach { tab ->
-            val isSelected = tab == selected
-            Column(
+        BoxWithConstraints(Modifier.fillMaxSize().padding(6.dp)) {
+            val tabWidth = maxWidth / AppTab.entries.size
+            val selectedIndex = AppTab.entries.indexOf(selected)
+            // Pil aktif bergeser dengan pegas ke tab yang dipilih, tidak langsung berpindah.
+            val pillX by animateDpAsState(
+                targetValue = tabWidth * selectedIndex,
+                animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
+                label = "tabPill",
+            )
+
+            Box(
                 Modifier
-                    .weight(1f)
+                    .offset(x = pillX)
+                    .width(tabWidth)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(30.dp))
-                    .background(if (isSelected) c.selectedPill else Color.Transparent)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onSelect(tab) },
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Icon(
-                    tab.icon,
-                    contentDescription = tab.label,
-                    tint = if (isSelected) c.control else c.textSecondary,
-                    modifier = Modifier.size(26.dp),
-                )
-                Text(
-                    tab.label,
-                    color = if (isSelected) c.control else c.textSecondary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                )
+                    .background(c.selectedPill),
+            )
+
+            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.SpaceBetween) {
+                AppTab.entries.forEach { tab ->
+                    val isSelected = tab == selected
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) { onSelect(tab) },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(
+                            tab.icon,
+                            contentDescription = tab.label,
+                            tint = if (isSelected) c.control else c.textSecondary,
+                            modifier = Modifier.size(26.dp),
+                        )
+                        Text(
+                            tab.label,
+                            color = if (isSelected) c.control else c.textSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
             }
         }
     }
