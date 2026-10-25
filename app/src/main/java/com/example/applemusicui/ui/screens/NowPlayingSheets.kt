@@ -34,15 +34,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -150,6 +153,34 @@ fun QueueSheet(controller: PlaybackController, onDismiss: () -> Unit) {
     val listState = rememberLazyListState()
     val drag = remember { QueueDragState() }
     val hasUpcomingUser = entries.withIndex().any { it.index > now && it.value.section == QueueSection.USER }
+    val density = LocalDensity.current
+    val edgeZonePx = with(density) { QUEUE_EDGE_ZONE.toPx() }
+    val edgeSpeedPx = with(density) { QUEUE_EDGE_SPEED.toPx() }
+
+    // Baris ditahan dekat tepi daftar: daftar ikut bergulir sendiri, dan penukaran posisi terus berjalan.
+    LaunchedEffect(drag.heldId) {
+        if (drag.heldId == null) return@LaunchedEffect
+        var previous = withFrameNanos { it }
+        while (true) {
+            val id = drag.heldId ?: break
+            val frame = withFrameNanos { it }
+            // Frame yang terlewat tidak dibayar penuh, supaya daftar tidak melonjak.
+            val seconds = ((frame - previous) / 1_000_000_000f).coerceAtMost(1f / 30f)
+            previous = frame
+            val info = listState.layoutInfo
+            val speed = edgeScrollSpeed(
+                top = drag.heldTop,
+                bottom = drag.heldTop + drag.heldSize,
+                viewportStart = info.viewportStartOffset,
+                viewportEnd = info.viewportEndOffset,
+                zone = edgeZonePx,
+                speed = edgeSpeedPx,
+            )
+            if (speed != 0f && listState.scrollBy(speed * seconds) != 0f) {
+                swapWithNeighbour(id, listState, drag, controller)
+            }
+        }
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = c.surface) {
         Box(Modifier.fillMaxWidth().heightIn(max = 620.dp)) {
@@ -280,6 +311,34 @@ fun QueueSheet(controller: PlaybackController, onDismiss: () -> Unit) {
             }
         }
     }
+}
+
+/** Jarak dari tepi daftar tempat gulir otomatis mulai, dan kecepatan maksimumnya. */
+private val QUEUE_EDGE_ZONE = 40.dp
+private val QUEUE_EDGE_SPEED = 340.dp
+
+/**
+ * Kecepatan gulir (px per detik) untuk baris yang ditahan di dekat tepi daftar.
+ * Nol kalau baris berada di tengah. Diadaptasi dari BitChord (GPL v3).
+ */
+private fun edgeScrollSpeed(
+    top: Float,
+    bottom: Float,
+    viewportStart: Int,
+    viewportEnd: Int,
+    zone: Float,
+    speed: Float,
+): Float {
+    if (zone <= 0f) return 0f
+    val intoStart = (viewportStart + zone) - top
+    val intoEnd = bottom - (viewportEnd - zone)
+    val reach = when {
+        intoStart > 0f && intoEnd <= 0f -> -intoStart
+        intoEnd > 0f && intoStart <= 0f -> intoEnd
+        else -> return 0f
+    }
+    val ramp = speed * (0.2f + 0.8f * (abs(reach) / zone).coerceAtMost(1f))
+    return if (reach < 0f) -ramp else ramp
 }
 
 /**
