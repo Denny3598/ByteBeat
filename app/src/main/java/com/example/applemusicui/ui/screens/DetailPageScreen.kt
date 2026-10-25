@@ -147,7 +147,8 @@ fun DetailPageScreen(
                     onPlay,
                 )
             } else {
-                AlbumBody(s.page, onPlay)
+                // Playlist (browse ID "VL...") memakai cover di setiap baris; album tetap memakai nomor urut.
+                AlbumBody(s.page, onPlay, showNumbers = !browseId.startsWith("VL"))
             }
             is DetailState.Artist -> ArtistBody(s.page, onPlay, onOpenPage)
             is DetailState.Podcast -> PodcastBody(s.page, onPlay)
@@ -247,7 +248,7 @@ private fun BoxScope.PageBackdrop(imageUrl: String?, tint: Color?) {
 }
 
 @Composable
-private fun AlbumBody(page: AlbumPage, onPlay: (Song, List<Song>) -> Unit) {
+private fun AlbumBody(page: AlbumPage, onPlay: (Song, List<Song>) -> Unit, showNumbers: Boolean = true) {
     val c = AppTheme.colors
     var sort by remember(page.title) { mutableStateOf(TrackSort.Original) }
     val songs = remember(page.songs, sort) { sort.apply(page.songs) }
@@ -309,7 +310,7 @@ private fun AlbumBody(page: AlbumPage, onPlay: (Song, List<Song>) -> Unit) {
                 }
             }
             itemsIndexed(songs) { index, song ->
-                TrackRow(song = song, number = index + 1) { onPlay(song, songs) }
+                TrackRow(song = song, number = if (showNumbers) index + 1 else null) { onPlay(song, songs) }
             }
         }
     }
