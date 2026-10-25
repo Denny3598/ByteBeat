@@ -33,8 +33,17 @@ import kotlin.math.abs
 /** Bagian antrean: dari mana sebuah lagu masuk. */
 enum class QueueSection { USER, CONTEXT, AUTOPLAY }
 
-/** Satu lagu di antrean beserta bagiannya. */
-data class QueueEntry(val song: Song, val section: QueueSection)
+private val queueEntrySeq = java.util.concurrent.atomic.AtomicLong()
+
+/**
+ * Satu lagu di antrean beserta bagiannya. [id] tetap sama walau entri pindah posisi,
+ * dipakai sebagai key di LazyColumn supaya baris yang sedang di-drag tidak hilang saat ditukar.
+ */
+data class QueueEntry(
+    val song: Song,
+    val section: QueueSection,
+    val id: Long = queueEntrySeq.incrementAndGet(),
+)
 
 /**
  * Pemutar untuk UI dan antrean. Hanya ada satu per proses, dan tidak dilepas saat layar ditutup,
