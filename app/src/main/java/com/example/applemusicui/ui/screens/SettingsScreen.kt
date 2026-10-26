@@ -174,6 +174,14 @@ fun SettingsScreen(
                 key = "full_cover",
                 default = true,
             )
+            SwitchRow(
+                icon = Icons.Filled.Tune,
+                title = "Riwayat di antrean",
+                subtitle = "Tampilkan lagu yang sudah diputar di atas antrean",
+                prefs = prefs,
+                key = QUEUE_SHOW_HISTORY_KEY,
+                default = true,
+            )
         }
 
         SectionLabel("Bahasa")

@@ -43,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalDensity
@@ -54,6 +55,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.example.applemusicui.data.AppPrefs
 import com.example.applemusicui.data.LyricsRepository
 import com.example.applemusicui.data.Song
 import com.example.applemusicui.ui.components.Artwork
@@ -64,6 +66,9 @@ import com.example.applemusicui.ui.theme.AppTheme
 import com.example.applemusicui.ui.theme.AppleRed
 import kotlinx.coroutines.CancellationException
 import kotlin.math.abs
+
+/** Kunci preferensi: tampilkan riwayat di antrean atau tidak. */
+const val QUEUE_SHOW_HISTORY_KEY = "queue_show_history"
 
 /** Sheet yang bisa dibuka dari pemutar penuh. */
 enum class NowSheet { Lyrics, Queue }
@@ -153,6 +158,8 @@ fun QueueSheet(controller: PlaybackController, onDismiss: () -> Unit) {
     val listState = rememberLazyListState()
     val drag = remember { QueueDragState() }
     val hasUpcomingUser = entries.withIndex().any { it.index > now && it.value.section == QueueSection.USER }
+    val prefs = AppPrefs.prefs(LocalContext.current)
+    val showHistory = remember { prefs.getBoolean(QUEUE_SHOW_HISTORY_KEY, true) }
     val density = LocalDensity.current
     val edgeZonePx = with(density) { QUEUE_EDGE_ZONE.toPx() }
     val edgeSpeedPx = with(density) { QUEUE_EDGE_SPEED.toPx() }
@@ -225,7 +232,7 @@ fun QueueSheet(controller: PlaybackController, onDismiss: () -> Unit) {
                 }
 
                 // Riwayat: lagu yang sudah diputar, paling lama di atas.
-                val past = entries.withIndex().filter { it.index < now }.takeLast(20)
+                val past = if (showHistory) entries.withIndex().filter { it.index < now }.takeLast(20) else emptyList()
                 if (past.isNotEmpty()) {
                     item(key = "heading-past") { QueueHeading("Riwayat") }
                     items(past, key = { it.value.id }) { indexed ->
