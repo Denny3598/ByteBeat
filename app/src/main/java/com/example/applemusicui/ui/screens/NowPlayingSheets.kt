@@ -160,24 +160,27 @@ fun QueueSheet(controller: PlaybackController, onDismiss: () -> Unit) {
     // Baris ditahan dekat tepi daftar: daftar ikut bergulir sendiri, dan penukaran posisi terus berjalan.
     LaunchedEffect(drag.heldId) {
         if (drag.heldId == null) return@LaunchedEffect
-        var previous = withFrameNanos { it }
-        while (true) {
-            val id = drag.heldId ?: break
-            val frame = withFrameNanos { it }
-            // Frame yang terlewat tidak dibayar penuh, supaya daftar tidak melonjak.
-            val seconds = ((frame - previous) / 1_000_000_000f).coerceAtMost(1f / 30f)
-            previous = frame
-            val info = listState.layoutInfo
-            val speed = edgeScrollSpeed(
-                top = drag.heldTop,
-                bottom = drag.heldTop + drag.heldSize,
-                viewportStart = info.viewportStartOffset,
-                viewportEnd = info.viewportEndOffset,
-                zone = edgeZonePx,
-                speed = edgeSpeedPx,
-            )
-            if (speed != 0f && listState.scrollBy(speed * seconds) != 0f) {
-                swapWithNeighbour(id, listState, drag, controller)
+        // scrollBy hanya tersedia di dalam scroll { }, yang juga memberi prioritas gulir untuk loop ini.
+        listState.scroll {
+            var previous = withFrameNanos { it }
+            while (true) {
+                val id = drag.heldId ?: break
+                val frame = withFrameNanos { it }
+                // Frame yang terlewat tidak dibayar penuh, supaya daftar tidak melonjak.
+                val seconds = ((frame - previous) / 1_000_000_000f).coerceAtMost(1f / 30f)
+                previous = frame
+                val info = listState.layoutInfo
+                val speed = edgeScrollSpeed(
+                    top = drag.heldTop,
+                    bottom = drag.heldTop + drag.heldSize,
+                    viewportStart = info.viewportStartOffset,
+                    viewportEnd = info.viewportEndOffset,
+                    zone = edgeZonePx,
+                    speed = edgeSpeedPx,
+                )
+                if (speed != 0f && scrollBy(speed * seconds) != 0f) {
+                    swapWithNeighbour(id, listState, drag, controller)
+                }
             }
         }
     }
