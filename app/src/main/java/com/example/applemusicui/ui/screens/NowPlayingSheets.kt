@@ -285,9 +285,7 @@ fun QueueSheet(controller: PlaybackController, onDismiss: () -> Unit) {
                                 .animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = tween(200))
                                 .alpha(if (isHeld) 0f else 1f)
                         ) {
-                            if (section == QueueSection.USER) {
-                                QueueDragHandle(entry.id, listState, drag, controller)
-                            }
+                            QueueDragHandle(entry.id, listState, drag, controller)
                             QueueAction(Icons.Filled.Close, "Hapus") { controller.removeUpcoming(i) }
                         }
                     }
@@ -405,7 +403,7 @@ private fun endDrag(drag: QueueDragState, entryId: Long) {
 }
 
 /**
- * Menukar baris yang dipegang dengan tetangga terdekat yang juga lagu berikutnya dari pengguna,
+ * Menukar baris yang dipegang dengan tetangga terdekat di bagiannya sendiri,
  * kalau pusat baris sudah melewati setengah tinggi tetangganya.
  */
 private fun swapWithNeighbour(
@@ -421,10 +419,12 @@ private fun swapWithNeighbour(
     drag.lastSwapOffset = null
 
     val entriesById: Map<Long, QueueEntry> = controller.entries.associateBy { it.id }
+    // Baris hanya boleh bertukar dengan tetangga di bagiannya sendiri.
+    val heldSection = entriesById[entryId]?.section ?: return
     val target = info.visibleItemsInfo
         .filter { item ->
             val id = item.key as? Long ?: return@filter false
-            id != entryId && entriesById[id]?.section == QueueSection.USER
+            id != entryId && entriesById[id]?.section == heldSection
         }
         .minByOrNull { abs(it.offset + it.size / 2f - drag.heldCenter) }
         ?: return
@@ -434,7 +434,7 @@ private fun swapWithNeighbour(
     val index = controller.entries.indexOfFirst { it.id == entryId }
     if (index < 0) return
     val dir = if (target.offset > held.offset) 1 else -1
-    controller.moveUserUpcomingBy(index, dir)
+    controller.moveUpcomingBy(index, dir)
     drag.lastSwapOffset = held.offset
 }
 

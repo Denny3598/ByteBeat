@@ -269,17 +269,18 @@ class PlaybackController private constructor(context: Context) {
     }
 
     /**
-     * Memindahkan lagu USER yang belum diputar sejauh [steps] posisi (positif = ke bawah).
-     * Berhenti kalau bertemu lagu yang bukan USER atau yang sudah diputar.
+     * Memindahkan lagu yang belum diputar sejauh [steps] posisi (positif = ke bawah).
+     * Hanya di dalam bagiannya sendiri (USER, CONTEXT, atau AUTOPLAY), dan berhenti di
+     * batas bagian atau sebelum lagu yang sudah diputar. Diadaptasi dari BitChord (GPL v3).
      */
-    fun moveUserUpcomingBy(index: Int, steps: Int) {
+    fun moveUpcomingBy(index: Int, steps: Int) {
         if (steps == 0) return
         val dir = if (steps > 0) 1 else -1
         var at = index
         repeat(abs(steps)) {
             val to = at + dir
             if (at <= currentIndex || to <= currentIndex || to !in queue.indices) return
-            if (queue[at].section != QueueSection.USER || queue[to].section != QueueSection.USER) return
+            if (queue[at].section != queue[to].section) return
             val item = queue.removeAt(at)
             queue.add(to, item)
             at = to
